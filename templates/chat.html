@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Flask AI Workshop{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
+    <!-- Chat Container -->
+    <div class="bg-white/60 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+        
+        <!-- Chat Header -->
+        <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    {% if user.picture %}
+                        <img src="{{ user.picture }}" alt="{{ user.name }}" class="w-12 h-12 rounded-full border-2 border-white shadow-lg">
+                    {% endif %}
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">AI Chat Assistant</h2>
+                        <p class="text-blue-100 text-sm">Ask me anything!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Messages Container -->
+        <div id="messages" class="p-6 h-[500px] overflow-y-auto space-y-4 bg-gradient-to-b from-gray-50 to-white">
+            <!-- Welcome message -->
+            <div class="flex justify-start">
+                <div class="bg-white rounded-2xl rounded-tl-none px-6 py-4 max-w-[80%] shadow-md border border-gray-200">
+                    <p class="text-gray-800">
+                        👋 Hello <strong>{{ user.name }}</strong>! I'm your AI assistant. How can I help you today?
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input Form -->
+        <div class="p-6 bg-white border-t border-gray-200">
+            <form id="chatForm" class="flex space-x-4">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type your message here..."
+                    class="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-blue-500 transition duration-300"
+                    autocomplete="off"
+                    required
+                >
+                <button 
+                    type="submit" 
+                    id="sendButton"
+                    class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-8 py-4 rounded-2xl shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105"
+                >
+                    Send →
+                </button>
+            </form>
+            <p class="text-xs text-gray-500 mt-3 text-center">
+                Press <kbd class="bg-gray-100 px-2 py-1 rounded border border-gray-300">Enter</kbd> to send
+            </p>
+        </div>
+        
+    </div>
+    
+    <!-- Tips Section -->
+    <div class="mt-8 bg-blue-50 rounded-2xl p-6 border border-blue-200">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">💡 Tips:</h3>
+        <ul class="space-y-2 text-blue-800">
+            <li>• Ask questions about any topic</li>
+            <li>• Request code examples or explanations</li>
+            <li>• Get help with learning new concepts</li>
+            <li>• Be specific for better responses</li>
+        </ul>
+    </div>
+    
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Get DOM elements
+    const chatForm = document.getElementById('chatForm');
+    const messageInput = document.getElementById('messageInput');
+    const messagesContainer = document.getElementById('messages');
+    const sendButton = document.getElementById('sendButton');
+    
+    // Function to scroll to bottom of messages
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Function to add a message to the chat
+    function addMessage(text, isUser = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+        
+        const messageContent = document.createElement('div');
+        messageContent.className = `rounded-2xl px-6 py-4 max-w-[80%] shadow-md ${
+            isUser 
+                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-tr-none' 
+                : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none'
+        }`;
+        
+        const textElement = document.createElement('p');
+        textElement.innerHTML = text.replace(/\n/g, '<br>');
+        messageContent.appendChild(textElement);
+        
+        messageDiv.appendChild(messageContent);
+        messagesContainer.appendChild(messageDiv);
+        
+        scrollToBottom();
+    }
+    
+    // Function to show loading indicator
+    function showLoading() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading';
+        loadingDiv.className = 'flex justify-start';
+        loadingDiv.innerHTML = `
+            <div class="bg-white rounded-2xl rounded-tl-none px-6 py-4 shadow-md border border-gray-200">
+                <div class="flex space-x-2">
+                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                </div>
+            </div>
+        `;
+        messagesContainer.appendChild(loadingDiv);
+        scrollToBottom();
+    }
+    
+    // Function to remove loading indicator
+    function removeLoading() {
+        const loading = document.getElementById('loading');
+        if (loading) {
+            loading.remove();
+        }
+    }
+    
+    // Handle form submission
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const message = messageInput.value.trim();
+        if (!message) return;
+        
+        // Disable input and button
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
+        
+        // Add user message to chat
+        addMessage(message, true);
+        messageInput.value = '';
+        
+        // Show loading indicator
+        showLoading();
+        
+        try {
+            // Send message to API
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message })
+            });
+            
+            const data = await response.json();
+            
+            // Remove loading indicator
+            removeLoading();
+            
+            if (response.ok) {
+                // Add AI response to chat
+                addMessage(data.response, false);
+            } else {
+                // Show error message
+                addMessage(`⚠️ Error: ${data.error || 'Failed to get response'}`, false);
+            }
+            
+        } catch (error) {
+            removeLoading();
+            addMessage('⚠️ Error: Could not connect to server. Please try again.', false);
+            console.error('Error:', error);
+        }
+        
+        // Re-enable input and button
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send →';
+        messageInput.focus();
+    });
+    
+    // Focus input on load
+    messageInput.focus();
+</script>
+{% endblock %}
