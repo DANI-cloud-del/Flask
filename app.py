@@ -18,7 +18,6 @@ import requests
 from functools import wraps
 import json
 import os
-import base64
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
@@ -246,12 +245,15 @@ def uploaded_file(filename):
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """API endpoint for AI chat with conversation memory and file support."""
+    """API endpoint for AI chat with conversation memory and file support.
+    
+    Supports both JSON (for simple messages) and FormData (for file uploads).
+    """
     try:
         user = session.get('user')
         user_id = get_user_id_by_google_id(user['google_id'])
         
-        # Handle file upload
+        # Handle file upload (FormData)
         uploaded_files = []
         file_context = ""
         
@@ -275,11 +277,16 @@ def api_chat():
                     'file_path': file_path
                 })
                 
-                # Process file for AI context
                 file_context = process_file_for_ai(file_path, file_type)
         
-        user_message = request.form.get('message', '').strip()
-        conversation_id = request.form.get('conversation_id')
+        # Get message and conversation_id from either JSON or FormData
+        if request.is_json:
+            data = request.get_json()
+            user_message = data.get('message', '').strip()
+            conversation_id = data.get('conversation_id')
+        else:
+            user_message = request.form.get('message', '').strip()
+            conversation_id = request.form.get('conversation_id')
         
         if not user_message and not uploaded_files:
             return jsonify({'error': 'Message or file is required'}), 400
@@ -373,7 +380,7 @@ def api_chat():
         return jsonify({'error': f'API error: {response.status_code}'}), 500
     
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in api_chat: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'An unexpected error occurred.'}), 500
@@ -397,19 +404,25 @@ def api_get_conversations():
 @login_required
 def api_get_conversation(conversation_id):
     """Get a specific conversation with messages."""
-    user = session.get('user')
-    user_id = get_user_id_by_google_id(user['google_id'])
-    
-    conversation = get_conversation(conversation_id, user_id)
-    if not conversation:
-        return jsonify({'error': 'Conversation not found'}), 404
-    
-    messages = get_conversation_messages(conversation_id, user_id)
-    
-    return jsonify({
-        'conversation': conversation,
-        'messages': messages
-    })
+    try:
+        user = session.get('user')
+        user_id = get_user_id_by_google_id(user['google_id'])
+        
+        conversation = get_conversation(conversation_id, user_id)
+        if not conversation:
+            return jsonify({'error': 'Conversation not found'}), 404
+        
+        messages = get_conversation_messages(conversation_id, user_id)
+        
+        return jsonify({
+            'conversation': conversation,
+            'messages': messages
+        })
+    except Exception as e:
+        print(f"Error in api_get_conversation: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Database error'}), 500
 
 
 @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
@@ -459,7 +472,10 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors."""
-    return render_template('500.html'), 500
+    print(f"500 Error: {error}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({'error': 'Internal server error'}), 500
 
 
 # ============================================================================
