@@ -205,7 +205,7 @@ def api_chat():
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
         
-        # Call Groq API
+        # Call Groq API with updated model
         response = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
             headers={
@@ -213,7 +213,7 @@ def api_chat():
                 'Content-Type': 'application/json'
             },
             json={
-                'model': 'llama-3.1-70b-versatile',
+                'model': 'llama-3.3-70b-versatile',  # UPDATED MODEL - March 2026
                 'messages': [
                     {
                         'role': 'system',
