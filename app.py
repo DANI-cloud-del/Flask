@@ -10,6 +10,7 @@ This is the main Flask application that demonstrates:
 - Modern web UI with Tailwind CSS
 - Text-to-Speech settings
 - Dark mode support
+- Malayalam language mode
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_from_directory
@@ -104,6 +105,26 @@ def process_file_for_ai(file_path, file_type):
             return f"[File uploaded: {file_type}]"
     except Exception as e:
         return f"[Could not process file: {str(e)}]"
+
+
+def translate_text(text, target_lang='ml'):
+    """Translate text using Google Translate API (free).
+    
+    Args:
+        text: Text to translate
+        target_lang: Target language code ('ml' for Malayalam)
+    """
+    try:
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl={target_lang}&dt=t&q={text}"
+        response = requests.get(url, timeout=5)
+        if response.ok:
+            result = response.json()
+            translated = ''.join([item[0] for item in result[0] if item[0]])
+            return translated
+        return text
+    except Exception as e:
+        print(f"[TRANSLATE ERROR] {e}")
+        return text
 
 
 # ============================================================================
@@ -230,7 +251,7 @@ def chat(conversation_id=None):
 @app.route('/settings')
 @login_required
 def settings():
-    """Settings page with TTS and dark mode configuration."""
+    """Settings page with TTS and Malayalam mode configuration."""
     user = session.get('user')
     return render_template('settings.html', user=user)
 
@@ -247,13 +268,13 @@ def uploaded_file(filename):
 
 
 # ============================================================================
-# API ROUTES - CHAT WITH CONVERSATION MEMORY
+# API ROUTES - CHAT WITH CONVERSATION MEMORY & MALAYALAM MODE
 # ============================================================================
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """API endpoint for AI chat with conversation memory and file support.
+    """API endpoint for AI chat with conversation memory, file support, and Malayalam mode.
     
     Supports both JSON (for simple messages) and FormData (for file uploads).
     """
@@ -299,23 +320,32 @@ def api_chat():
                 file_context = process_file_for_ai(file_path, file_type)
                 print(f"[API CHAT] File uploaded: {filename}")
         
-        # Get message and conversation_id from either JSON or FormData
+        # Get message, conversation_id, and Malayalam mode from either JSON or FormData
         if request.is_json:
             data = request.get_json()
             user_message = data.get('message', '').strip()
             conversation_id = data.get('conversation_id')
+            malayalam_mode = data.get('malayalam_mode', False)
         else:
             user_message = request.form.get('message', '').strip()
             conversation_id = request.form.get('conversation_id')
+            malayalam_mode = request.form.get('malayalam_mode', 'false').lower() == 'true'
         
-        print(f"[API CHAT] Message: '{user_message[:50]}...', Conv ID: {conversation_id}")
+        print(f"[API CHAT] Message: '{user_message[:50]}...', Conv ID: {conversation_id}, Malayalam: {malayalam_mode}")
         
         if not user_message and not uploaded_files:
             return jsonify({'error': 'Message or file is required'}), 400
         
+        # Translate to Malayalam if mode is enabled
+        original_message = user_message
+        if malayalam_mode and user_message:
+            print(f"[MALAYALAM] Translating: {user_message[:30]}...")
+            user_message = translate_text(user_message, 'ml')
+            print(f"[MALAYALAM] Translated: {user_message[:30]}...")
+        
         # Create new conversation if none exists
         if not conversation_id:
-            title = generate_conversation_title(user_message or "File upload")
+            title = generate_conversation_title(original_message or "File upload")
             print(f"[API CHAT] Creating new conversation: '{title}'")
             print(f"[API CHAT] With user_id: {user_id}")
             conversation_id = create_conversation(user_id, title)
@@ -334,7 +364,7 @@ def api_chat():
         if file_context:
             full_message += f"\n\n{file_context}"
         
-        # Store user message
+        # Store user message (in Malayalam if translated)
         message_id = add_message(conversation_id, 'user', full_message, has_attachment=bool(uploaded_files))
         print(f"[API CHAT] Stored user message ID: {message_id}")
         
@@ -353,11 +383,18 @@ def api_chat():
         conversation_history = get_conversation_messages(conversation_id, user_id, include_attachments=False)
         print(f"[API CHAT] Conversation history: {len(conversation_history)} messages")
         
+        # Build system message based on language mode
+        system_message = 'You are a helpful AI assistant. Provide clear, concise, and friendly responses. You have access to the full conversation history, so you can reference previous messages and maintain context.'
+        
+        if malayalam_mode:
+            system_message += ' IMPORTANT: The user is communicating in Malayalam. You MUST respond ONLY in Malayalam language. Do not use English in your responses.'
+            print(f"[MALAYALAM] AI will respond in Malayalam")
+        
         # Build messages array with full conversation history
         messages = [
             {
                 'role': 'system',
-                'content': 'You are a helpful AI assistant. Provide clear, concise, and friendly responses. You have access to the full conversation history, so you can reference previous messages and maintain context.'
+                'content': system_message
             }
         ]
         
@@ -404,7 +441,8 @@ def api_chat():
         return jsonify({
             'response': ai_response,
             'conversation_id': conversation_id,
-            'files': [{'filename': f['original_filename'], 'type': f['file_type']} for f in uploaded_files]
+            'files': [{'filename': f['original_filename'], 'type': f['file_type']} for f in uploaded_files],
+            'malayalam_mode': malayalam_mode
         })
         
     except requests.exceptions.Timeout:
@@ -420,6 +458,30 @@ def api_chat():
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
+
+
+# ============================================================================
+# API ROUTES - TRANSLATION
+# ============================================================================
+
+@app.route('/api/translate', methods=['POST'])
+@login_required
+def api_translate():
+    """API endpoint for text translation."""
+    try:
+        data = request.get_json()
+        text = data.get('text', '')
+        target_lang = data.get('target_lang', 'ml')
+        
+        if not text:
+            return jsonify({'error': 'Text is required'}), 400
+        
+        translated = translate_text(text, target_lang)
+        return jsonify({'translated': translated})
+        
+    except Exception as e:
+        print(f"[TRANSLATE ERROR] {e}")
+        return jsonify({'error': 'Translation failed'}), 500
 
 
 # ============================================================================
@@ -526,6 +588,7 @@ if __name__ == '__main__':
     print(f"Port: 5001")
     print(f"Database: {DATABASE_FILE}")
     print(f"Upload folder: {UPLOAD_FOLDER}")
+    print("Features: Malayalam Mode, File Upload, Conversation Memory")
     print("="*60 + "\n")
     
     app.run(
