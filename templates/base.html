@@ -1,66 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Flask AI Workshop{% endblock %}</title>
-    
-    <!-- Tailwind CSS CDN -->
+    <title>{% block title %}AI Assistant{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Custom Tailwind Configuration -->
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#3B82F6',
-                        secondary: '#8B5CF6',
+                        primary: '#0A0A0A',
+                        secondary: '#1A1A1A',
+                        accent: '#3B82F6',
+                        muted: '#6B7280'
                     }
                 }
             }
         }
     </script>
-    
-    {% block extra_head %}{% endblock %}
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .animate-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .smooth-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .smooth-hover:hover {
+            transform: translateY(-2px);
+        }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 via-white to-purple-50 min-h-screen">
-    
-    <!-- Navigation Bar -->
-    <nav class="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo/Brand -->
-                <div class="flex items-center">
-                    <a href="{{ url_for('index') }}" class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 text-transparent bg-clip-text">
-                        🤖 AI Assistant
-                    </a>
-                </div>
-                
-                <!-- Navigation Links -->
-                <div class="flex items-center space-x-4">
-                    {% if session.user %}
-                        <span class="text-gray-700">Hello, <span class="font-semibold">{{ session.user.name }}</span></span>
-                        <a href="{{ url_for('logout') }}" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-300">
-                            Logout
-                        </a>
-                    {% else %}
-                        <a href="{{ url_for('login') }}" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition duration-300">
-                            Sign In with Google
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </nav>
+<body class="h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
     
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div class="fixed top-4 right-4 z-50 space-y-2">
                 {% for category, message in messages %}
-                    <div class="{% if category == 'error' %}bg-red-100 border-red-500 text-red-700{% elif category == 'warning' %}bg-yellow-100 border-yellow-500 text-yellow-700{% elif category == 'success' %}bg-green-100 border-green-500 text-green-700{% else %}bg-blue-100 border-blue-500 text-blue-700{% endif %} border-l-4 p-4 rounded-r-lg shadow-sm mb-4">
-                        <p class="font-medium">{{ message }}</p>
+                    <div class="glass rounded-lg px-6 py-4 shadow-xl max-w-md animate-slide-in"
+                         x-data="{ show: true }"
+                         x-show="show"
+                         x-init="setTimeout(() => show = false, 5000)">
+                        <div class="flex items-center space-x-3">
+                            {% if category == 'success' %}
+                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            {% elif category == 'error' %}
+                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            {% elif category == 'warning' %}
+                                <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                </svg>
+                            {% else %}
+                                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            {% endif %}
+                            <p class="text-sm text-gray-200">{{ message }}</p>
+                        </div>
                     </div>
                 {% endfor %}
             </div>
@@ -68,18 +96,8 @@
     {% endwith %}
     
     <!-- Main Content -->
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+    {% block content %}{% endblock %}
     
-    <!-- Footer -->
-    <footer class="mt-auto py-6 text-center text-gray-600">
-        <p class="text-sm">
-            Built with ❤️ using Flask & Tailwind CSS | 
-            <a href="https://github.com" class="text-blue-600 hover:underline">View on GitHub</a>
-        </p>
-    </footer>
-    
-    {% block scripts %}{% endblock %}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </body>
 </html>

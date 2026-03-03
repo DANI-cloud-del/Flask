@@ -1,197 +1,322 @@
 {% extends "base.html" %}
 
-{% block title %}Chat - Flask AI Workshop{% endblock %}
+{% block title %}Chat - AI Assistant{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="h-screen flex flex-col">
+    <!-- Header -->
+    <header class="glass border-b border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <span class="text-xl font-semibold">AI Assistant</span>
+                </div>
+                
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <div class="hidden sm:flex items-center space-x-3">
+                        {% if user.picture %}
+                        <img src="{{ user.picture }}" class="w-8 h-8 rounded-full border-2 border-blue-500" alt="Profile">
+                        {% endif %}
+                        <span class="text-sm text-gray-300">{{ user.name }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" 
+                       class="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        <span>Sign out</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
     
     <!-- Chat Container -->
-    <div class="bg-white/60 backdrop-blur-lg rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
-        
-        <!-- Chat Header -->
-        <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-6">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                    {% if user.picture %}
-                        <img src="{{ user.picture }}" alt="{{ user.name }}" class="w-12 h-12 rounded-full border-2 border-white shadow-lg">
-                    {% endif %}
-                    <div>
-                        <h2 class="text-2xl font-bold text-white">AI Chat Assistant</h2>
-                        <p class="text-blue-100 text-sm">Ask me anything!</p>
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar (Optional) -->
+        <aside class="hidden lg:block w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto">
+            <div class="p-4">
+                <button class="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span>New Chat</span>
+                </button>
+                
+                <div class="mt-6 space-y-2">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider px-3 mb-2">Recent</div>
+                    <div class="px-3 py-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
+                        <div class="text-sm font-medium text-white truncate">Current conversation</div>
+                        <div class="text-xs text-gray-400 mt-1">Just now</div>
                     </div>
                 </div>
             </div>
-        </div>
+        </aside>
         
-        <!-- Messages Container -->
-        <div id="messages" class="p-6 h-[500px] overflow-y-auto space-y-4 bg-gradient-to-b from-gray-50 to-white">
-            <!-- Welcome message -->
-            <div class="flex justify-start">
-                <div class="bg-white rounded-2xl rounded-tl-none px-6 py-4 max-w-[80%] shadow-md border border-gray-200">
-                    <p class="text-gray-800">
-                        👋 Hello <strong>{{ user.name }}</strong>! I'm your AI assistant. How can I help you today?
-                    </p>
+        <!-- Main Chat Area -->
+        <main class="flex-1 flex flex-col">
+            <!-- Messages Container -->
+            <div id="messages" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                <!-- Welcome Message -->
+                <div class="max-w-3xl mx-auto">
+                    <div class="text-center py-12">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold mb-2">How can I help you today?</h2>
+                        <p class="text-gray-400">Ask me anything - I'm here to assist you</p>
+                    </div>
+                    
+                    <!-- Suggested Prompts -->
+                    <div class="grid sm:grid-cols-2 gap-3 mt-8">
+                        <button onclick="sendSuggestedPrompt('Explain quantum computing in simple terms')" 
+                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                            <div class="flex items-start space-x-3">
+                                <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-medium group-hover:text-blue-400 transition">Learn something new</div>
+                                    <div class="text-sm text-gray-400 mt-1">Explain quantum computing</div>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button onclick="sendSuggestedPrompt('Write a Python function to sort a list')" 
+                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                            <div class="flex items-start space-x-3">
+                                <svg class="w-5 h-5 text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-medium group-hover:text-purple-400 transition">Code assistance</div>
+                                    <div class="text-sm text-gray-400 mt-1">Write a Python function</div>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button onclick="sendSuggestedPrompt('Give me creative ideas for a mobile app')" 
+                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                            <div class="flex items-start space-x-3">
+                                <svg class="w-5 h-5 text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-medium group-hover:text-green-400 transition">Brainstorm ideas</div>
+                                    <div class="text-sm text-gray-400 mt-1">Creative app concepts</div>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button onclick="sendSuggestedPrompt('Summarize the latest AI trends in 2026')" 
+                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                            <div class="flex items-start space-x-3">
+                                <svg class="w-5 h-5 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                </svg>
+                                <div>
+                                    <div class="font-medium group-hover:text-yellow-400 transition">Get insights</div>
+                                    <div class="text-sm text-gray-400 mt-1">Latest AI trends</div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <!-- Input Form -->
-        <div class="p-6 bg-white border-t border-gray-200">
-            <form id="chatForm" class="flex space-x-4">
-                <input 
-                    type="text" 
-                    id="messageInput" 
-                    placeholder="Type your message here..."
-                    class="flex-1 px-6 py-4 border-2 border-gray-200 rounded-2xl focus:outline-none focus:border-blue-500 transition duration-300"
-                    autocomplete="off"
-                    required
-                >
-                <button 
-                    type="submit" 
-                    id="sendButton"
-                    class="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold px-8 py-4 rounded-2xl shadow-lg hover:shadow-xl transition duration-300 transform hover:scale-105"
-                >
-                    Send →
-                </button>
-            </form>
-            <p class="text-xs text-gray-500 mt-3 text-center">
-                Press <kbd class="bg-gray-100 px-2 py-1 rounded border border-gray-300">Enter</kbd> to send
-            </p>
-        </div>
-        
+            
+            <!-- Input Area -->
+            <div class="border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm">
+                <div class="max-w-3xl mx-auto p-4">
+                    <form id="chatForm" class="flex items-end space-x-3">
+                        <div class="flex-1">
+                            <textarea 
+                                id="messageInput" 
+                                rows="1"
+                                placeholder="Ask me anything..."
+                                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-white placeholder-gray-400"
+                                style="max-height: 200px;"
+                            ></textarea>
+                        </div>
+                        <button 
+                            type="submit" 
+                            id="sendButton"
+                            class="flex items-center justify-center w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </button>
+                    </form>
+                    <div class="text-xs text-gray-500 text-center mt-3">
+                        AI can make mistakes. Verify important information.
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-    
-    <!-- Tips Section -->
-    <div class="mt-8 bg-blue-50 rounded-2xl p-6 border border-blue-200">
-        <h3 class="text-lg font-semibold text-blue-900 mb-3">💡 Tips:</h3>
-        <ul class="space-y-2 text-blue-800">
-            <li>• Ask questions about any topic</li>
-            <li>• Request code examples or explanations</li>
-            <li>• Get help with learning new concepts</li>
-            <li>• Be specific for better responses</li>
-        </ul>
-    </div>
-    
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-    // Get DOM elements
-    const chatForm = document.getElementById('chatForm');
-    const messageInput = document.getElementById('messageInput');
-    const messagesContainer = document.getElementById('messages');
-    const sendButton = document.getElementById('sendButton');
+const messageInput = document.getElementById('messageInput');
+const chatForm = document.getElementById('chatForm');
+const messagesContainer = document.getElementById('messages');
+const sendButton = document.getElementById('sendButton');
+
+// Auto-resize textarea
+messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+// Handle form submission
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const message = messageInput.value.trim();
+    if (!message) return;
     
-    // Function to scroll to bottom of messages
-    function scrollToBottom() {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    await sendMessage(message);
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+});
+
+// Handle Enter key (Shift+Enter for new line)
+messageInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.dispatchEvent(new Event('submit'));
     }
+});
+
+function sendSuggestedPrompt(prompt) {
+    messageInput.value = prompt;
+    chatForm.dispatchEvent(new Event('submit'));
+}
+
+async function sendMessage(message) {
+    // Add user message
+    addMessage(message, 'user');
     
-    // Function to add a message to the chat
-    function addMessage(text, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+    // Disable input
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    
+    // Add loading indicator
+    const loadingId = addLoadingMessage();
+    
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ message })
+        });
         
-        const messageContent = document.createElement('div');
-        messageContent.className = `rounded-2xl px-6 py-4 max-w-[80%] shadow-md ${
-            isUser 
-                ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-tr-none' 
-                : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none'
-        }`;
+        const data = await response.json();
         
-        const textElement = document.createElement('p');
-        textElement.innerHTML = text.replace(/\n/g, '<br>');
-        messageContent.appendChild(textElement);
+        // Remove loading indicator
+        removeLoadingMessage(loadingId);
         
-        messageDiv.appendChild(messageContent);
-        messagesContainer.appendChild(messageDiv);
-        
-        scrollToBottom();
+        if (response.ok) {
+            addMessage(data.response, 'assistant');
+        } else {
+            addMessage(data.error || 'An error occurred', 'error');
+        }
+    } catch (error) {
+        removeLoadingMessage(loadingId);
+        addMessage('Failed to send message. Please try again.', 'error');
+    } finally {
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+        messageInput.focus();
     }
+}
+
+function addMessage(content, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'max-w-3xl mx-auto';
     
-    // Function to show loading indicator
-    function showLoading() {
-        const loadingDiv = document.createElement('div');
-        loadingDiv.id = 'loading';
-        loadingDiv.className = 'flex justify-start';
-        loadingDiv.innerHTML = `
-            <div class="bg-white rounded-2xl rounded-tl-none px-6 py-4 shadow-md border border-gray-200">
-                <div class="flex space-x-2">
-                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
-                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-3 h-3 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+    if (type === 'user') {
+        messageDiv.innerHTML = `
+            <div class="flex justify-end">
+                <div class="bg-blue-600 rounded-2xl rounded-tr-sm px-6 py-3 max-w-2xl">
+                    <p class="text-white whitespace-pre-wrap">${escapeHtml(content)}</p>
                 </div>
             </div>
         `;
-        messagesContainer.appendChild(loadingDiv);
-        scrollToBottom();
+    } else if (type === 'assistant') {
+        messageDiv.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 glass rounded-2xl rounded-tl-sm px-6 py-4">
+                    <p class="text-gray-200 whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</p>
+                </div>
+            </div>
+        `;
+    } else if (type === 'error') {
+        messageDiv.innerHTML = `
+            <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="flex-1 bg-red-900/30 border border-red-700 rounded-2xl px-6 py-4">
+                    <p class="text-red-300">${escapeHtml(content)}</p>
+                </div>
+            </div>
+        `;
     }
     
-    // Function to remove loading indicator
-    function removeLoading() {
-        const loading = document.getElementById('loading');
-        if (loading) {
-            loading.remove();
-        }
-    }
-    
-    // Handle form submission
-    chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const message = messageInput.value.trim();
-        if (!message) return;
-        
-        // Disable input and button
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-        sendButton.textContent = 'Sending...';
-        
-        // Add user message to chat
-        addMessage(message, true);
-        messageInput.value = '';
-        
-        // Show loading indicator
-        showLoading();
-        
-        try {
-            // Send message to API
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: message })
-            });
-            
-            const data = await response.json();
-            
-            // Remove loading indicator
-            removeLoading();
-            
-            if (response.ok) {
-                // Add AI response to chat
-                addMessage(data.response, false);
-            } else {
-                // Show error message
-                addMessage(`⚠️ Error: ${data.error || 'Failed to get response'}`, false);
-            }
-            
-        } catch (error) {
-            removeLoading();
-            addMessage('⚠️ Error: Could not connect to server. Please try again.', false);
-            console.error('Error:', error);
-        }
-        
-        // Re-enable input and button
-        messageInput.disabled = false;
-        sendButton.disabled = false;
-        sendButton.textContent = 'Send →';
-        messageInput.focus();
-    });
-    
-    // Focus input on load
-    messageInput.focus();
+    messagesContainer.appendChild(messageDiv);
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function addLoadingMessage() {
+    const loadingId = 'loading-' + Date.now();
+    const messageDiv = document.createElement('div');
+    messageDiv.id = loadingId;
+    messageDiv.className = 'max-w-3xl mx-auto';
+    messageDiv.innerHTML = `
+        <div class="flex items-start space-x-3">
+            <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <div class="flex-1 glass rounded-2xl px-6 py-4">
+                <div class="flex space-x-2">
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                </div>
+            </div>
+        </div>
+    `;
+    messagesContainer.appendChild(messageDiv);
+    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    return loadingId;
+}
+
+function removeLoadingMessage(loadingId) {
+    const loadingMsg = document.getElementById(loadingId);
+    if (loadingMsg) loadingMsg.remove();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 </script>
 {% endblock %}
