@@ -109,7 +109,7 @@ def init_db():
             ON attachments(message_id)
         ''')
         
-        print("Database initialized successfully!")
+        print("[DB] Database initialized successfully!")
 
 
 # ============================================================================
@@ -121,7 +121,9 @@ def get_user_by_google_id(google_id):
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM users WHERE google_id = ?', (google_id,))
-        return cursor.fetchone()
+        result = cursor.fetchone()
+        print(f"[DB] get_user_by_google_id({google_id}): {'Found' if result else 'Not found'}")
+        return result
 
 
 def create_user(google_id, email, name, picture=None):
@@ -132,7 +134,9 @@ def create_user(google_id, email, name, picture=None):
             INSERT INTO users (google_id, email, name, picture)
             VALUES (?, ?, ?, ?)
         ''', (google_id, email, name, picture))
-        return cursor.lastrowid
+        user_id = cursor.lastrowid
+        print(f"[DB] create_user({email}): Created with ID {user_id}")
+        return user_id
 
 
 def update_user(google_id, email, name, picture=None):
@@ -144,6 +148,7 @@ def update_user(google_id, email, name, picture=None):
             SET email = ?, name = ?, picture = ?, last_login = CURRENT_TIMESTAMP
             WHERE google_id = ?
         ''', (email, name, picture, google_id))
+        print(f"[DB] update_user({email}): Updated")
 
 
 def get_user_id_by_google_id(google_id):
@@ -152,7 +157,9 @@ def get_user_id_by_google_id(google_id):
         cursor = conn.cursor()
         cursor.execute('SELECT id FROM users WHERE google_id = ?', (google_id,))
         result = cursor.fetchone()
-        return result['id'] if result else None
+        user_id = result['id'] if result else None
+        print(f"[DB] get_user_id_by_google_id({google_id}): {user_id}")
+        return user_id
 
 
 # ============================================================================
@@ -161,13 +168,21 @@ def get_user_id_by_google_id(google_id):
 
 def create_conversation(user_id, title='New Chat'):
     """Create a new conversation for a user."""
+    print(f"[DB] create_conversation: user_id={user_id}, title='{title}'")
+    
+    if user_id is None:
+        print(f"[DB ERROR] create_conversation: user_id is None!")
+        raise ValueError("user_id cannot be None")
+    
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO conversations (user_id, title)
             VALUES (?, ?)
         ''', (user_id, title))
-        return cursor.lastrowid
+        conv_id = cursor.lastrowid
+        print(f"[DB] create_conversation: Created conversation ID {conv_id}")
+        return conv_id
 
 
 def get_user_conversations(user_id, limit=20):
@@ -189,7 +204,9 @@ def get_user_conversations(user_id, limit=20):
             ORDER BY c.updated_at DESC
             LIMIT ?
         ''', (user_id, limit))
-        return [dict(row) for row in cursor.fetchall()]
+        conversations = [dict(row) for row in cursor.fetchall()]
+        print(f"[DB] get_user_conversations({user_id}): Found {len(conversations)} conversations")
+        return conversations
 
 
 def get_conversation(conversation_id, user_id):
@@ -201,6 +218,7 @@ def get_conversation(conversation_id, user_id):
             WHERE id = ? AND user_id = ?
         ''', (conversation_id, user_id))
         result = cursor.fetchone()
+        print(f"[DB] get_conversation({conversation_id}, {user_id}): {'Found' if result else 'Not found'}")
         return dict(result) if result else None
 
 
@@ -213,7 +231,9 @@ def update_conversation_title(conversation_id, title, user_id):
             SET title = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ? AND user_id = ?
         ''', (title, conversation_id, user_id))
-        return cursor.rowcount > 0
+        success = cursor.rowcount > 0
+        print(f"[DB] update_conversation_title({conversation_id}): {'Success' if success else 'Failed'}")
+        return success
 
 
 def delete_conversation(conversation_id, user_id):
@@ -224,7 +244,9 @@ def delete_conversation(conversation_id, user_id):
             DELETE FROM conversations 
             WHERE id = ? AND user_id = ?
         ''', (conversation_id, user_id))
-        return cursor.rowcount > 0
+        success = cursor.rowcount > 0
+        print(f"[DB] delete_conversation({conversation_id}): {'Success' if success else 'Failed'}")
+        return success
 
 
 def update_conversation_timestamp(conversation_id):
@@ -268,6 +290,7 @@ def add_message(conversation_id, role, content, has_attachment=False):
             WHERE id = ?
         ''', (conversation_id,))
         
+        print(f"[DB] add_message({conversation_id}, {role}): Created message ID {message_id}")
         return message_id
 
 
@@ -282,7 +305,8 @@ def get_conversation_messages(conversation_id, user_id, include_attachments=True
         ''', (conversation_id, user_id))
         
         if not cursor.fetchone():
-            return None
+            print(f"[DB] get_conversation_messages: User {user_id} doesn't own conversation {conversation_id}")
+            return []
         
         # Get messages
         cursor.execute('''
@@ -300,6 +324,7 @@ def get_conversation_messages(conversation_id, user_id, include_attachments=True
                 if message['has_attachment']:
                     message['attachments'] = get_message_attachments(message['id'])
         
+        print(f"[DB] get_conversation_messages({conversation_id}): Found {len(messages)} messages")
         return messages
 
 
@@ -315,7 +340,9 @@ def add_attachment(message_id, filename, original_filename, file_type, file_size
             INSERT INTO attachments (message_id, filename, original_filename, file_type, file_size, file_path)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (message_id, filename, original_filename, file_type, file_size, file_path))
-        return cursor.lastrowid
+        attachment_id = cursor.lastrowid
+        print(f"[DB] add_attachment({message_id}): Created attachment ID {attachment_id}")
+        return attachment_id
 
 
 def get_message_attachments(message_id):
