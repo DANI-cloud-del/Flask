@@ -7,6 +7,7 @@ This is the main Flask application that demonstrates:
 - Session management
 - RESTful API design
 - Modern web UI with Tailwind CSS
+- Text-to-Speech settings
 """
 
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
@@ -93,46 +94,16 @@ def index():
 @app.route('/login')
 def login():
     """Initiate Google OAuth login flow."""
-    print("\n" + "="*60)
-    print("[DEBUG] LOGIN - Starting OAuth flow")
-    print("="*60)
-    
     redirect_uri = url_for('authorize', _external=True)
-    print(f"[DEBUG] Redirect URI: {redirect_uri}")
-    print(f"[DEBUG] Client ID: {config.GOOGLE_CLIENT_ID[:20]}...")
-    print("="*60 + "\n")
-    
     return oauth.google.authorize_redirect(redirect_uri)
 
 
 @app.route('/authorize')
 def authorize():
     """OAuth callback route."""
-    print("\n" + "="*60)
-    print("[DEBUG] AUTHORIZE - OAuth callback received")
-    print("="*60)
-    
     try:
-        # Log request details
-        print(f"[DEBUG] Request URL: {request.url}")
-        print(f"[DEBUG] Request args: {dict(request.args)}")
-        
-        # Check for error in callback
-        if 'error' in request.args:
-            error = request.args.get('error')
-            error_description = request.args.get('error_description', 'No description')
-            print(f"[ERROR] OAuth error from Google: {error}")
-            print(f"[ERROR] Description: {error_description}")
-            flash(f'OAuth error: {error_description}', 'error')
-            return redirect(url_for('index'))
-        
-        print("[DEBUG] Attempting to authorize access token...")
         token = oauth.google.authorize_access_token()
-        print(f"[DEBUG] Token received: {bool(token)}")
-        print(f"[DEBUG] Token keys: {list(token.keys()) if token else 'None'}")
-        
         user_info = token.get('userinfo')
-        print(f"[DEBUG] User info retrieved: {bool(user_info)}")
         
         if user_info:
             google_id = user_info.get('sub')
@@ -140,24 +111,13 @@ def authorize():
             name = user_info.get('name')
             picture = user_info.get('picture')
             
-            print(f"[DEBUG] User details:")
-            print(f"  - Google ID: {google_id}")
-            print(f"  - Email: {email}")
-            print(f"  - Name: {name}")
-            print(f"  - Picture: {picture[:50] if picture else 'None'}...")
-            
-            print("[DEBUG] Checking if user exists in database...")
             user = get_user_by_google_id(google_id)
             
             if user:
-                print(f"[DEBUG] User found in DB (ID: {user['id']}), updating...")
                 update_user(google_id, email, name, picture)
             else:
-                print("[DEBUG] New user, creating in database...")
-                user_id = create_user(google_id, email, name, picture)
-                print(f"[DEBUG] User created with ID: {user_id}")
+                create_user(google_id, email, name, picture)
             
-            print("[DEBUG] Setting session data...")
             session['user'] = {
                 'google_id': google_id,
                 'email': email,
@@ -165,37 +125,21 @@ def authorize():
                 'picture': picture
             }
             
-            print(f"[DEBUG] Session user set: {bool(session.get('user'))}")
-            print("="*60)
-            print("[SUCCESS] Authentication successful!")
-            print("="*60 + "\n")
-            
             flash(f'Welcome, {name}!', 'success')
             return redirect(url_for('chat'))
         else:
-            print("[ERROR] No user info in token")
-            print(f"[ERROR] Token content: {token}")
             flash('Failed to get user information from Google.', 'error')
             return redirect(url_for('index'))
             
     except Exception as e:
-        print("\n" + "="*60)
-        print("[ERROR] Exception in authorize()")
-        print("="*60)
-        print(f"[ERROR] Exception type: {type(e).__name__}")
-        print(f"[ERROR] Exception message: {str(e)}")
-        print(f"[ERROR] Full traceback:")
-        print(traceback.format_exc())
-        print("="*60 + "\n")
-        
-        flash(f'Authentication failed: {str(e)}', 'error')
+        print(f"OAuth error: {e}")
+        flash('Authentication failed. Please try again.', 'error')
         return redirect(url_for('index'))
 
 
 @app.route('/logout')
 def logout():
     """Log out the current user."""
-    print("\n[DEBUG] User logging out...")
     session.pop('user', None)
     session.pop('current_conversation_id', None)
     flash('You have been logged out.', 'info')
@@ -236,6 +180,14 @@ def chat(conversation_id=None):
     )
 
 
+@app.route('/settings')
+@login_required
+def settings():
+    """Settings page with TTS configuration."""
+    user = session.get('user')
+    return render_template('settings.html', user=user)
+
+
 # ============================================================================
 # API ROUTES - CHAT
 # ============================================================================
@@ -244,10 +196,6 @@ def chat(conversation_id=None):
 @login_required
 def api_chat():
     """API endpoint for AI chat with message storage."""
-    print("\n" + "="*60)
-    print("[DEBUG] API Chat Request Started")
-    print("="*60)
-    
     try:
         user = session.get('user')
         user_id = get_user_id_by_google_id(user['google_id'])
@@ -255,10 +203,6 @@ def api_chat():
         data = request.get_json()
         user_message = data.get('message', '').strip()
         conversation_id = data.get('conversation_id')
-        
-        print(f"[DEBUG] User ID: {user_id}")
-        print(f"[DEBUG] User message: {user_message}")
-        print(f"[DEBUG] Conversation ID: {conversation_id}")
         
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
@@ -268,7 +212,6 @@ def api_chat():
             title = generate_conversation_title(user_message)
             conversation_id = create_conversation(user_id, title)
             session['current_conversation_id'] = conversation_id
-            print(f"[DEBUG] Created new conversation: {conversation_id}")
         else:
             # Verify user owns this conversation
             conv = get_conversation(conversation_id, user_id)
@@ -277,7 +220,6 @@ def api_chat():
         
         # Store user message
         add_message(conversation_id, 'user', user_message)
-        print(f"[DEBUG] Stored user message")
         
         # Prepare AI request
         payload = {
@@ -296,8 +238,6 @@ def api_chat():
             'max_tokens': 1024
         }
         
-        print(f"[DEBUG] Calling Groq API...")
-        
         # Call Groq API
         response = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
@@ -309,42 +249,28 @@ def api_chat():
             timeout=30
         )
         
-        print(f"[DEBUG] Response status: {response.status_code}")
-        
         response.raise_for_status()
         result = response.json()
         
         # Extract AI response
         ai_response = result['choices'][0]['message']['content']
-        print(f"[DEBUG] Got AI response ({len(ai_response)} chars)")
         
         # Store AI response
         add_message(conversation_id, 'assistant', ai_response)
-        print(f"[DEBUG] Stored AI response")
-        
-        print("="*60)
-        print("[DEBUG] Request completed successfully")
-        print("="*60 + "\n")
         
         return jsonify({
             'response': ai_response,
             'conversation_id': conversation_id
         })
         
-    except requests.exceptions.Timeout as e:
-        print(f"[ERROR] Timeout: {e}")
+    except requests.exceptions.Timeout:
         return jsonify({'error': 'Request timed out. Please try again.'}), 504
     
-    except requests.exceptions.HTTPError as e:
-        print(f"[ERROR] HTTP Error: {e}")
-        print(f"[ERROR] Response: {response.text}")
+    except requests.exceptions.HTTPError:
         return jsonify({'error': f'API error: {response.status_code}'}), 500
     
     except Exception as e:
-        print(f"[ERROR] Unexpected error: {type(e).__name__}")
-        print(f"[ERROR] Details: {e}")
-        import traceback
-        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+        print(f"Error: {e}")
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
 
@@ -389,7 +315,6 @@ def api_delete_conversation(conversation_id):
     user_id = get_user_id_by_google_id(user['google_id'])
     
     if delete_conversation(conversation_id, user_id):
-        # Clear from session if it's the current one
         if session.get('current_conversation_id') == conversation_id:
             session.pop('current_conversation_id', None)
         return jsonify({'success': True})
@@ -442,10 +367,7 @@ if __name__ == '__main__':
     print("="*60)
     print(f"Debug mode: {config.DEBUG}")
     print(f"Port: 5001")
-    print(f"Groq API Key configured: {bool(config.GROQ_API_KEY)}")
     print(f"Database: {DATABASE_FILE}")
-    print(f"Google Client ID: {config.GOOGLE_CLIENT_ID[:30]}...")
-    print(f"Secret Key configured: {bool(config.SECRET_KEY)}")
     print("="*60 + "\n")
     
     app.run(
