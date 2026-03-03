@@ -39,6 +39,40 @@
             </div>
         </div>
 
+        <!-- Malayalam Mode Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-indigo-200 p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">മലയാളം Mode (Malayalam)</h3>
+                        <p class="text-sm text-gray-600">Type in English, AI responds in Malayalam</p>
+                    </div>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="malayalamMode" class="sr-only peer" onchange="toggleMalayalamMode()">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                </label>
+            </div>
+            
+            <!-- Info box when enabled -->
+            <div id="malayalamInfo" class="hidden mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div class="flex items-start space-x-2">
+                    <svg class="w-5 h-5 text-indigo-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <div class="text-sm text-indigo-800">
+                        <p class="font-medium mb-1">മലയാളം മോഡ് സജീവം (Malayalam Mode Active)</p>
+                        <p>Your messages will be translated to Malayalam, and AI will respond in Malayalam. A Malayalam/Indian voice will be selected automatically for TTS.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Text-to-Speech Settings -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
@@ -119,20 +153,6 @@
             </div>
         </div>
 
-        <!-- Theme Settings (Future) -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 opacity-50">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-900">Dark Mode</h2>
-                    <p class="text-sm text-gray-600 mt-1">Coming soon</p>
-                </div>
-                <label class="relative inline-flex items-center cursor-not-allowed">
-                    <input type="checkbox" disabled class="sr-only peer">
-                    <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                </label>
-            </div>
-        </div>
-
         <!-- Danger Zone -->
         <div class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
             <h2 class="text-lg font-semibold text-red-900 mb-4">Danger Zone</h2>
@@ -169,13 +189,28 @@ function loadVoices() {
         
         // Group voices by language
         const englishVoices = availableVoices.filter(v => v.lang.startsWith('en'));
-        const otherVoices = availableVoices.filter(v => !v.lang.startsWith('en'));
+        const indianVoices = availableVoices.filter(v => v.lang.includes('IN') || v.name.includes('Hindi') || v.name.includes('Malayalam') || v.name.includes('Raveena') || v.name.includes('Aditi'));
+        const otherVoices = availableVoices.filter(v => !v.lang.startsWith('en') && !indianVoices.includes(v));
+        
+        // Add Indian voices first (for Malayalam mode)
+        if (indianVoices.length > 0) {
+            const group = document.createElement('optgroup');
+            group.label = 'Indian / Malayalam';
+            indianVoices.forEach((voice) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                if (voice.default) option.textContent += ' - Default';
+                group.appendChild(option);
+            });
+            voiceSelect.appendChild(group);
+        }
         
         // Add English voices
         if (englishVoices.length > 0) {
             const group = document.createElement('optgroup');
             group.label = 'English';
-            englishVoices.forEach((voice, index) => {
+            englishVoices.forEach((voice) => {
                 const option = document.createElement('option');
                 option.value = voice.name;
                 option.textContent = `${voice.name} (${voice.lang})`;
@@ -189,7 +224,7 @@ function loadVoices() {
         if (otherVoices.length > 0) {
             const group = document.createElement('optgroup');
             group.label = 'Other Languages';
-            otherVoices.forEach((voice, index) => {
+            otherVoices.forEach((voice) => {
                 const option = document.createElement('option');
                 option.value = voice.name;
                 option.textContent = `${voice.name} (${voice.lang})`;
@@ -208,6 +243,16 @@ function loadVoices() {
 
 // Load settings from localStorage
 function loadSettings() {
+    // Malayalam mode
+    const malayalamEnabled = localStorage.getItem('malayalam_mode') === 'true';
+    document.getElementById('malayalamMode').checked = malayalamEnabled;
+    document.getElementById('malayalamInfo').classList.toggle('hidden', !malayalamEnabled);
+    
+    if (malayalamEnabled) {
+        // Wait for voices to load then select Malayalam voice
+        setTimeout(() => selectMalayalamVoice(), 100);
+    }
+    
     // TTS enabled
     const ttsEnabled = localStorage.getItem('tts_enabled') === 'true';
     document.getElementById('ttsEnabled').checked = ttsEnabled;
@@ -231,6 +276,64 @@ function loadSettings() {
     const volume = localStorage.getItem('tts_volume') || '100';
     document.getElementById('speechVolume').value = volume;
     document.getElementById('volumeValue').textContent = volume;
+}
+
+// Toggle Malayalam Mode
+function toggleMalayalamMode() {
+    const enabled = document.getElementById('malayalamMode').checked;
+    localStorage.setItem('malayalam_mode', enabled);
+    document.getElementById('malayalamInfo').classList.toggle('hidden', !enabled);
+    
+    if (enabled) {
+        // Auto-select Malayalam voice and enable TTS
+        selectMalayalamVoice();
+        
+        // Enable TTS if not already enabled
+        if (!document.getElementById('ttsEnabled').checked) {
+            document.getElementById('ttsEnabled').checked = true;
+            localStorage.setItem('tts_enabled', 'true');
+            document.getElementById('ttsOptions').classList.remove('hidden');
+        }
+        
+        // Show notification
+        alert('മലയാളം മോഡ് സജീവമാക്കി! (Malayalam Mode Enabled!)\n\nType in English, and AI will respond in Malayalam.');
+    } else {
+        alert('Malayalam Mode Disabled');
+    }
+}
+
+// Select Malayalam/Indian voice automatically
+function selectMalayalamVoice() {
+    const voiceSelect = document.getElementById('voiceSelect');
+    
+    // Common Malayalam/Indian voice patterns (in order of preference)
+    const malayalamVoicePatterns = [
+        'malayalam',
+        'ml-in',
+        'raveena',
+        'aditi',
+        'hi-in',
+        'hindi',
+        'indian'
+    ];
+    
+    // Try to find a matching voice
+    for (const pattern of malayalamVoicePatterns) {
+        for (let i = 0; i < voiceSelect.options.length; i++) {
+            const optionText = voiceSelect.options[i].text.toLowerCase();
+            const optionValue = voiceSelect.options[i].value.toLowerCase();
+            
+            if (optionText.includes(pattern) || optionValue.includes(pattern)) {
+                voiceSelect.selectedIndex = i;
+                saveVoiceSettings();
+                console.log('🇮🇳 Selected Malayalam/Indian voice:', voiceSelect.options[i].text);
+                return true;
+            }
+        }
+    }
+    
+    console.log('No Malayalam voice found, keeping current selection');
+    return false;
 }
 
 // Toggle TTS
@@ -278,7 +381,12 @@ function testTTS() {
     // Stop any current speech
     speechSynthesis.cancel();
     
-    const text = "Hello! This is a test of the text-to-speech feature. How does it sound?";
+    // Check if Malayalam mode is enabled
+    const malayalamMode = localStorage.getItem('malayalam_mode') === 'true';
+    const text = malayalamMode 
+        ? "നമസ്കാരം! ഇത് ടെക്സ്റ്റ് ടു സ്പീച്ച് ഫീച്ചറിന്റെ ഒരു ടെസ്റ്റ് ആണ്. എങ്ങനെ തോന്നുന്നു?" 
+        : "Hello! This is a test of the text-to-speech feature. How does it sound?";
+    
     const utterance = new SpeechSynthesisUtterance(text);
     
     // Apply settings
