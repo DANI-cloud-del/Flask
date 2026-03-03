@@ -1,28 +1,35 @@
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
 *.so
-
-# Virtual environments
+.Python
 venv/
+env/
 ENV/
-.venv/
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
 .env
-.env.*
 
-# Package distributions
-*.egg-info/
-dist/
-build/
-*.whl
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-# Logs and coverage
-*.log
-.coverage
-.pytest_cache/
-.mypy_cache/
-
-# IDE and OS files
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
