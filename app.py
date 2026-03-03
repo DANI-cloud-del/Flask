@@ -12,6 +12,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from authlib.integrations.flask_client import OAuth
 import requests
 from functools import wraps
+import json
 
 # Import our custom modules
 from config import config
@@ -197,13 +198,42 @@ def api_chat():
             "error": "Error message"
         }
     """
+    print("\n" + "="*60)
+    print("[DEBUG] API Chat Request Started")
+    print("="*60)
+    
     try:
         # Get message from request
         data = request.get_json()
         user_message = data.get('message', '').strip()
         
+        print(f"[DEBUG] User message: {user_message}")
+        
         if not user_message:
+            print("[DEBUG] Empty message received")
             return jsonify({'error': 'Message is required'}), 400
+        
+        # Prepare request payload
+        payload = {
+            'model': 'llama-3.3-70b-versatile',
+            'messages': [
+                {
+                    'role': 'system',
+                    'content': 'You are a helpful AI assistant. Provide clear, concise, and friendly responses.'
+                },
+                {
+                    'role': 'user',
+                    'content': user_message
+                }
+            ],
+            'temperature': 0.7,
+            'max_tokens': 1024
+        }
+        
+        print(f"[DEBUG] Model: {payload['model']}")
+        print(f"[DEBUG] API Key present: {bool(config.GROQ_API_KEY)}")
+        print(f"[DEBUG] API Key starts with: {config.GROQ_API_KEY[:10]}..." if config.GROQ_API_KEY else "[DEBUG] No API key!")
+        print("[DEBUG] Sending request to Groq API...")
         
         # Call Groq API with updated model
         response = requests.post(
@@ -212,41 +242,69 @@ def api_chat():
                 'Authorization': f'Bearer {config.GROQ_API_KEY}',
                 'Content-Type': 'application/json'
             },
-            json={
-                'model': 'llama-3.3-70b-versatile',  # UPDATED MODEL - March 2026
-                'messages': [
-                    {
-                        'role': 'system',
-                        'content': 'You are a helpful AI assistant. Provide clear, concise, and friendly responses.'
-                    },
-                    {
-                        'role': 'user',
-                        'content': user_message
-                    }
-                ],
-                'temperature': 0.7,
-                'max_tokens': 1024
-            },
+            json=payload,
             timeout=30
         )
         
+        print(f"[DEBUG] Response status code: {response.status_code}")
+        print(f"[DEBUG] Response headers: {dict(response.headers)}")
+        
+        # Try to get response text even if there's an error
+        try:
+            response_data = response.json()
+            print(f"[DEBUG] Response JSON: {json.dumps(response_data, indent=2)}")
+        except Exception as json_error:
+            print(f"[DEBUG] Could not parse JSON response: {json_error}")
+            print(f"[DEBUG] Raw response text: {response.text}")
+            response_data = None
+        
+        # Raise error if status is not 200
         response.raise_for_status()
-        result = response.json()
+        
+        if not response_data:
+            response_data = response.json()
         
         # Extract AI response
-        ai_response = result['choices'][0]['message']['content']
+        ai_response = response_data['choices'][0]['message']['content']
+        print(f"[DEBUG] AI response extracted successfully")
+        print(f"[DEBUG] Response length: {len(ai_response)} characters")
+        print("="*60)
+        print("[DEBUG] Request completed successfully")
+        print("="*60 + "\n")
         
         return jsonify({'response': ai_response})
         
-    except requests.exceptions.Timeout:
+    except requests.exceptions.Timeout as e:
+        print(f"[ERROR] Request timeout: {e}")
+        print("="*60 + "\n")
         return jsonify({'error': 'Request timed out. Please try again.'}), 504
     
+    except requests.exceptions.HTTPError as e:
+        print(f"[ERROR] HTTP Error: {e}")
+        print(f"[ERROR] Status code: {response.status_code}")
+        print(f"[ERROR] Response: {response.text}")
+        print("="*60 + "\n")
+        return jsonify({'error': f'API error: {response.status_code}'}), 500
+    
     except requests.exceptions.RequestException as e:
-        print(f"Groq API error: {e}")
+        print(f"[ERROR] Request exception: {type(e).__name__}")
+        print(f"[ERROR] Details: {e}")
+        print("="*60 + "\n")
         return jsonify({'error': 'Failed to get AI response. Please try again.'}), 500
     
+    except KeyError as e:
+        print(f"[ERROR] KeyError - Missing field in response: {e}")
+        if response_data:
+            print(f"[ERROR] Available keys: {list(response_data.keys())}")
+        print("="*60 + "\n")
+        return jsonify({'error': 'Invalid response from AI service.'}), 500
+    
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"[ERROR] Unexpected error: {type(e).__name__}")
+        print(f"[ERROR] Details: {e}")
+        import traceback
+        print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
+        print("="*60 + "\n")
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
 
@@ -273,6 +331,14 @@ def internal_error(error):
 if __name__ == '__main__':
     # Run the Flask development server
     # WARNING: Do not use in production! Use Gunicorn or similar.
+    print("\n" + "="*60)
+    print("Flask AI Workshop - Starting Server")
+    print("="*60)
+    print(f"Debug mode: {config.DEBUG}")
+    print(f"Port: 5001")
+    print(f"Groq API Key configured: {bool(config.GROQ_API_KEY)}")
+    print("="*60 + "\n")
+    
     app.run(
         debug=config.DEBUG,
         host='0.0.0.0',  # Allow external connections
