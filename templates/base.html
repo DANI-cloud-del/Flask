@@ -10,9 +10,9 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#0A0A0A',
-                        secondary: '#1A1A1A',
-                        accent: '#3B82F6',
+                        primary: '#F9FAFB',
+                        secondary: '#F3F4F6',
+                        accent: '#2563EB',
                         muted: '#6B7280'
                     }
                 }
@@ -27,67 +27,62 @@
         }
         
         .gradient-text {
-            background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+            background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
         
-        .glass {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .animate-float {
-            animation: float 3s ease-in-out infinite;
-        }
-        
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-        
         .smooth-hover {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         }
         
-        .smooth-hover:hover {
-            transform: translateY(-2px);
+        .message-enter {
+            animation: messageSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes messageSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
     </style>
 </head>
-<body class="h-full bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+<body class="h-full bg-white text-gray-900">
     
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             <div class="fixed top-4 right-4 z-50 space-y-2">
                 {% for category, message in messages %}
-                    <div class="glass rounded-lg px-6 py-4 shadow-xl max-w-md animate-slide-in"
+                    <div class="bg-white border rounded-xl px-6 py-4 shadow-lg max-w-md animate-slide-in"
                          x-data="{ show: true }"
                          x-show="show"
                          x-init="setTimeout(() => show = false, 5000)">
                         <div class="flex items-center space-x-3">
                             {% if category == 'success' %}
-                                <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                 </svg>
                             {% elif category == 'error' %}
-                                <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
                             {% elif category == 'warning' %}
-                                <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                                 </svg>
                             {% else %}
-                                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                 </svg>
                             {% endif %}
-                            <p class="text-sm text-gray-200">{{ message }}</p>
+                            <p class="text-sm text-gray-700">{{ message }}</p>
                         </div>
                     </div>
                 {% endfor %}

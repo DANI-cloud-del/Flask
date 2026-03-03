@@ -3,170 +3,166 @@
 {% block title %}Chat - AI Assistant{% endblock %}
 
 {% block content %}
-<div class="h-screen flex flex-col">
+<div class="h-screen flex flex-col bg-white">
     <!-- Header -->
-    <header class="glass border-b border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
+    <header class="border-b border-gray-200 bg-white/80 backdrop-blur-md sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6">
+            <div class="flex justify-between items-center h-14">
                 <!-- Logo -->
-                <div class="flex items-center space-x-3">
-                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
-                    <span class="text-xl font-semibold">AI Assistant</span>
+                    <span class="text-lg font-semibold text-gray-900">AI Assistant</span>
                 </div>
                 
                 <!-- User Menu -->
-                <div class="flex items-center space-x-4">
-                    <div class="hidden sm:flex items-center space-x-3">
+                <div class="flex items-center space-x-3">
+                    <button onclick="startNewChat()" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <span>New</span>
+                    </button>
+                    <div class="hidden sm:flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg">
                         {% if user.picture %}
-                        <img src="{{ user.picture }}" class="w-8 h-8 rounded-full border-2 border-blue-500" alt="Profile">
+                        <img src="{{ user.picture }}" class="w-6 h-6 rounded-full" alt="Profile">
                         {% endif %}
-                        <span class="text-sm text-gray-300">{{ user.name }}</span>
+                        <span class="text-sm text-gray-700">{{ user.name.split()[0] }}</span>
                     </div>
                     <a href="{{ url_for('logout') }}" 
-                       class="flex items-center space-x-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition text-sm">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition" title="Sign out">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
                         </svg>
-                        <span>Sign out</span>
                     </a>
                 </div>
             </div>
         </div>
     </header>
     
-    <!-- Chat Container -->
-    <div class="flex-1 flex overflow-hidden">
-        <!-- Sidebar (Optional) -->
-        <aside class="hidden lg:block w-64 bg-gray-800 border-r border-gray-700 overflow-y-auto">
-            <div class="p-4">
-                <button class="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    <span>New Chat</span>
-                </button>
-                
-                <div class="mt-6 space-y-2">
-                    <div class="text-xs text-gray-500 uppercase tracking-wider px-3 mb-2">Recent</div>
-                    <div class="px-3 py-2 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition">
-                        <div class="text-sm font-medium text-white truncate">Current conversation</div>
-                        <div class="text-xs text-gray-400 mt-1">Just now</div>
-                    </div>
-                </div>
-            </div>
-        </aside>
-        
-        <!-- Main Chat Area -->
-        <main class="flex-1 flex flex-col">
-            <!-- Messages Container -->
-            <div id="messages" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                <!-- Welcome Message -->
-                <div class="max-w-3xl mx-auto">
-                    <div class="text-center py-12">
-                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4">
+    <!-- Main Chat Area -->
+    <main class="flex-1 overflow-hidden flex flex-col">
+        <!-- Messages Container -->
+        <div id="messagesContainer" class="flex-1 overflow-y-auto">
+            <div id="messages" class="max-w-3xl mx-auto px-4 py-6">
+                <!-- Welcome Section - Centered -->
+                <div id="welcomeSection" class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                    <div class="mb-8">
+                        <div class="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
                             <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                             </svg>
                         </div>
-                        <h2 class="text-2xl font-bold mb-2">How can I help you today?</h2>
-                        <p class="text-gray-400">Ask me anything - I'm here to assist you</p>
+                        <h2 class="text-3xl font-bold text-gray-900 mb-3">How can I help you today?</h2>
+                        <p class="text-gray-600 text-lg">Ask me anything or try one of these prompts</p>
                     </div>
                     
-                    <!-- Suggested Prompts -->
-                    <div class="grid sm:grid-cols-2 gap-3 mt-8">
+                    <!-- Suggested Prompts Grid -->
+                    <div class="grid sm:grid-cols-2 gap-3 w-full max-w-2xl mt-4">
                         <button onclick="sendSuggestedPrompt('Explain quantum computing in simple terms')" 
-                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                                class="p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-left transition group">
                             <div class="flex items-start space-x-3">
-                                <svg class="w-5 h-5 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-                                </svg>
-                                <div>
-                                    <div class="font-medium group-hover:text-blue-400 transition">Learn something new</div>
-                                    <div class="text-sm text-gray-400 mt-1">Explain quantum computing</div>
+                                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 group-hover:text-blue-600 transition">Explain a concept</div>
+                                    <div class="text-sm text-gray-600 mt-1">Quantum computing basics</div>
                                 </div>
                             </div>
                         </button>
                         
-                        <button onclick="sendSuggestedPrompt('Write a Python function to sort a list')" 
-                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                        <button onclick="sendSuggestedPrompt('Write a Python function to calculate fibonacci numbers')" 
+                                class="p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-left transition group">
                             <div class="flex items-start space-x-3">
-                                <svg class="w-5 h-5 text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                                </svg>
-                                <div>
-                                    <div class="font-medium group-hover:text-purple-400 transition">Code assistance</div>
-                                    <div class="text-sm text-gray-400 mt-1">Write a Python function</div>
+                                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 group-hover:text-purple-600 transition">Write code</div>
+                                    <div class="text-sm text-gray-600 mt-1">Python fibonacci function</div>
                                 </div>
                             </div>
                         </button>
                         
-                        <button onclick="sendSuggestedPrompt('Give me creative ideas for a mobile app')" 
-                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                        <button onclick="sendSuggestedPrompt('Give me 5 creative ideas for a mobile productivity app')" 
+                                class="p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-left transition group">
                             <div class="flex items-start space-x-3">
-                                <svg class="w-5 h-5 text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                                </svg>
-                                <div>
-                                    <div class="font-medium group-hover:text-green-400 transition">Brainstorm ideas</div>
-                                    <div class="text-sm text-gray-400 mt-1">Creative app concepts</div>
+                                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 group-hover:text-green-600 transition">Brainstorm ideas</div>
+                                    <div class="text-sm text-gray-600 mt-1">App concepts</div>
                                 </div>
                             </div>
                         </button>
                         
-                        <button onclick="sendSuggestedPrompt('Summarize the latest AI trends in 2026')" 
-                                class="glass p-4 rounded-xl hover:bg-gray-700 transition text-left group">
+                        <button onclick="sendSuggestedPrompt('What are the latest trends in AI for 2026?')" 
+                                class="p-4 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-left transition group">
                             <div class="flex items-start space-x-3">
-                                <svg class="w-5 h-5 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                                </svg>
-                                <div>
-                                    <div class="font-medium group-hover:text-yellow-400 transition">Get insights</div>
-                                    <div class="text-sm text-gray-400 mt-1">Latest AI trends</div>
+                                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-medium text-gray-900 group-hover:text-orange-600 transition">Get insights</div>
+                                    <div class="text-sm text-gray-600 mt-1">AI trends 2026</div>
                                 </div>
                             </div>
                         </button>
                     </div>
                 </div>
+                
+                <!-- Actual Messages Will Be Added Here -->
+                <div id="conversationMessages" class="space-y-6 mt-6 hidden"></div>
             </div>
-            
-            <!-- Input Area -->
-            <div class="border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm">
-                <div class="max-w-3xl mx-auto p-4">
-                    <form id="chatForm" class="flex items-end space-x-3">
-                        <div class="flex-1">
-                            <textarea 
-                                id="messageInput" 
-                                rows="1"
-                                placeholder="Ask me anything..."
-                                class="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-white placeholder-gray-400"
-                                style="max-height: 200px;"
-                            ></textarea>
-                        </div>
-                        <button 
-                            type="submit" 
-                            id="sendButton"
-                            class="flex items-center justify-center w-12 h-12 bg-blue-600 hover:bg-blue-700 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed">
-                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                        </button>
-                    </form>
-                    <div class="text-xs text-gray-500 text-center mt-3">
-                        AI can make mistakes. Verify important information.
-                    </div>
+        </div>
+        
+        <!-- Input Area - Initially Centered -->
+        <div id="inputContainer" class="border-t border-gray-200 bg-white">
+            <div class="max-w-3xl mx-auto px-4 py-4">
+                <form id="chatForm" class="relative">
+                    <textarea 
+                        id="messageInput" 
+                        rows="1"
+                        placeholder="Message AI Assistant..."
+                        class="w-full pl-4 pr-12 py-4 bg-white border-2 border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500 resize-none text-gray-900 placeholder-gray-500 shadow-sm"
+                        style="max-height: 200px;"
+                    ></textarea>
+                    <button 
+                        type="submit" 
+                        id="sendButton"
+                        class="absolute right-2 bottom-2 flex items-center justify-center w-10 h-10 bg-blue-600 hover:bg-blue-700 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                    </button>
+                </form>
+                <div class="text-xs text-gray-500 text-center mt-2">
+                    AI can make mistakes. Verify important information.
                 </div>
             </div>
-        </main>
-    </div>
+        </div>
+    </main>
 </div>
 
 <script>
 const messageInput = document.getElementById('messageInput');
 const chatForm = document.getElementById('chatForm');
-const messagesContainer = document.getElementById('messages');
+const messagesContainer = document.getElementById('messagesContainer');
+const conversationMessages = document.getElementById('conversationMessages');
+const welcomeSection = document.getElementById('welcomeSection');
 const sendButton = document.getElementById('sendButton');
+let hasMessages = false;
 
 // Auto-resize textarea
 messageInput.addEventListener('input', function() {
@@ -185,7 +181,7 @@ chatForm.addEventListener('submit', async (e) => {
     messageInput.style.height = 'auto';
 });
 
-// Handle Enter key (Shift+Enter for new line)
+// Handle Enter key
 messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -193,12 +189,26 @@ messageInput.addEventListener('keydown', (e) => {
     }
 });
 
+function startNewChat() {
+    conversationMessages.innerHTML = '';
+    conversationMessages.classList.add('hidden');
+    welcomeSection.classList.remove('hidden');
+    hasMessages = false;
+}
+
 function sendSuggestedPrompt(prompt) {
     messageInput.value = prompt;
     chatForm.dispatchEvent(new Event('submit'));
 }
 
 async function sendMessage(message) {
+    // Hide welcome section and show conversation on first message
+    if (!hasMessages) {
+        welcomeSection.classList.add('hidden');
+        conversationMessages.classList.remove('hidden');
+        hasMessages = true;
+    }
+    
     // Add user message
     addMessage(message, 'user');
     
@@ -240,62 +250,65 @@ async function sendMessage(message) {
 
 function addMessage(content, type) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'max-w-3xl mx-auto';
+    messageDiv.className = 'message-enter';
     
     if (type === 'user') {
         messageDiv.innerHTML = `
-            <div class="flex justify-end">
-                <div class="bg-blue-600 rounded-2xl rounded-tr-sm px-6 py-3 max-w-2xl">
-                    <p class="text-white whitespace-pre-wrap">${escapeHtml(content)}</p>
+            <div class="flex justify-end mb-4">
+                <div class="bg-gray-100 rounded-2xl rounded-tr-sm px-5 py-3 max-w-2xl">
+                    <p class="text-gray-900 whitespace-pre-wrap">${escapeHtml(content)}</p>
                 </div>
             </div>
         `;
     } else if (type === 'assistant') {
         messageDiv.innerHTML = `
-            <div class="flex items-start space-x-3">
-                <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-start space-x-3 mb-4">
+                <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mt-1">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                 </div>
-                <div class="flex-1 glass rounded-2xl rounded-tl-sm px-6 py-4">
-                    <p class="text-gray-200 whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</p>
+                <div class="flex-1">
+                    <p class="text-gray-800 whitespace-pre-wrap leading-relaxed">${escapeHtml(content)}</p>
                 </div>
             </div>
         `;
     } else if (type === 'error') {
         messageDiv.innerHTML = `
-            <div class="flex items-start space-x-3">
-                <div class="flex-shrink-0 w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-start space-x-3 mb-4">
+                <div class="flex-shrink-0 w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mt-1">
+                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="flex-1 bg-red-900/30 border border-red-700 rounded-2xl px-6 py-4">
-                    <p class="text-red-300">${escapeHtml(content)}</p>
+                <div class="flex-1">
+                    <p class="text-red-700">${escapeHtml(content)}</p>
                 </div>
             </div>
         `;
     }
     
-    messagesContainer.appendChild(messageDiv);
-    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    conversationMessages.appendChild(messageDiv);
+    messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: 'smooth'
+    });
 }
 
 function addLoadingMessage() {
     const loadingId = 'loading-' + Date.now();
     const messageDiv = document.createElement('div');
     messageDiv.id = loadingId;
-    messageDiv.className = 'max-w-3xl mx-auto';
+    messageDiv.className = 'message-enter';
     messageDiv.innerHTML = `
-        <div class="flex items-start space-x-3">
-            <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-start space-x-3 mb-4">
+            <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mt-1">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                 </svg>
             </div>
-            <div class="flex-1 glass rounded-2xl px-6 py-4">
-                <div class="flex space-x-2">
+            <div class="flex-1">
+                <div class="flex space-x-1">
                     <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0s"></div>
                     <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
                     <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
@@ -303,8 +316,11 @@ function addLoadingMessage() {
             </div>
         </div>
     `;
-    messagesContainer.appendChild(messageDiv);
-    messageDiv.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    conversationMessages.appendChild(messageDiv);
+    messagesContainer.scrollTo({
+        top: messagesContainer.scrollHeight,
+        behavior: 'smooth'
+    });
     return loadingId;
 }
 
