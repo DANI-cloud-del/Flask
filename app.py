@@ -3,19 +3,24 @@
 This is the main Flask application that demonstrates:
 - Google OAuth authentication
 - AI chat integration with Groq
-- Chat history storage
+- Chat history storage with conversation memory
+- File upload and processing
 - Session management
 - RESTful API design
 - Modern web UI with Tailwind CSS
 - Text-to-Speech settings
+- Dark mode support
 """
 
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, send_from_directory
 from authlib.integrations.flask_client import OAuth
 import requests
 from functools import wraps
 import json
-import traceback
+import os
+import base64
+from werkzeug.utils import secure_filename
+from datetime import datetime
 
 # Import our custom modules
 from config import config
@@ -33,12 +38,24 @@ from database import (
     delete_conversation,
     update_conversation_title,
     generate_conversation_title,
+    add_attachment,
+    get_message_attachments,
     DATABASE_FILE
 )
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = config.SECRET_KEY
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# File upload configuration
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf', 'txt', 'doc', 'docx'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Validate configuration
 try:
@@ -62,6 +79,32 @@ oauth.register(
         'scope': 'openid email profile'
     }
 )
+
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def allowed_file(filename):
+    """Check if file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def process_file_for_ai(file_path, file_type):
+    """Process uploaded file for AI context."""
+    try:
+        if file_type in ['txt']:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                return f"File content:\n{content[:2000]}"  # Limit to 2000 chars
+        elif file_type in ['png', 'jpg', 'jpeg', 'gif']:
+            return "[Image uploaded - AI can describe images if requested]"
+        elif file_type == 'pdf':
+            return "[PDF document uploaded - content analysis available]"
+        else:
+            return f"[File uploaded: {file_type}]"
+    except Exception as e:
+        return f"[Could not process file: {str(e)}]"
 
 
 # ============================================================================
@@ -158,10 +201,7 @@ def chat(conversation_id=None):
     user = session.get('user')
     user_id = get_user_id_by_google_id(user['google_id'])
     
-    # Get user's conversations for sidebar
     conversations = get_user_conversations(user_id)
-    
-    # If conversation_id provided, load that conversation
     current_conversation = None
     messages = []
     
@@ -183,59 +223,121 @@ def chat(conversation_id=None):
 @app.route('/settings')
 @login_required
 def settings():
-    """Settings page with TTS configuration."""
+    """Settings page with TTS and dark mode configuration."""
     user = session.get('user')
     return render_template('settings.html', user=user)
 
 
 # ============================================================================
-# API ROUTES - CHAT
+# ROUTES - FILE UPLOADS
+# ============================================================================
+
+@app.route('/uploads/<filename>')
+@login_required
+def uploaded_file(filename):
+    """Serve uploaded files."""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+# ============================================================================
+# API ROUTES - CHAT WITH CONVERSATION MEMORY
 # ============================================================================
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """API endpoint for AI chat with message storage."""
+    """API endpoint for AI chat with conversation memory and file support."""
     try:
         user = session.get('user')
         user_id = get_user_id_by_google_id(user['google_id'])
         
-        data = request.get_json()
-        user_message = data.get('message', '').strip()
-        conversation_id = data.get('conversation_id')
+        # Handle file upload
+        uploaded_files = []
+        file_context = ""
         
-        if not user_message:
-            return jsonify({'error': 'Message is required'}), 400
+        if 'file' in request.files:
+            file = request.files['file']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                unique_filename = f"{timestamp}_{filename}"
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                file.save(file_path)
+                
+                file_type = filename.rsplit('.', 1)[1].lower()
+                file_size = os.path.getsize(file_path)
+                
+                uploaded_files.append({
+                    'filename': unique_filename,
+                    'original_filename': filename,
+                    'file_type': file_type,
+                    'file_size': file_size,
+                    'file_path': file_path
+                })
+                
+                # Process file for AI context
+                file_context = process_file_for_ai(file_path, file_type)
+        
+        user_message = request.form.get('message', '').strip()
+        conversation_id = request.form.get('conversation_id')
+        
+        if not user_message and not uploaded_files:
+            return jsonify({'error': 'Message or file is required'}), 400
         
         # Create new conversation if none exists
         if not conversation_id:
-            title = generate_conversation_title(user_message)
+            title = generate_conversation_title(user_message or "File upload")
             conversation_id = create_conversation(user_id, title)
             session['current_conversation_id'] = conversation_id
         else:
-            # Verify user owns this conversation
+            conversation_id = int(conversation_id)
             conv = get_conversation(conversation_id, user_id)
             if not conv:
                 return jsonify({'error': 'Invalid conversation'}), 403
         
-        # Store user message
-        add_message(conversation_id, 'user', user_message)
+        # Build message content
+        full_message = user_message
+        if file_context:
+            full_message += f"\n\n{file_context}"
         
-        # Prepare AI request
+        # Store user message
+        message_id = add_message(conversation_id, 'user', full_message, has_attachment=bool(uploaded_files))
+        
+        # Store attachments
+        for file_info in uploaded_files:
+            add_attachment(
+                message_id,
+                file_info['filename'],
+                file_info['original_filename'],
+                file_info['file_type'],
+                file_info['file_size'],
+                file_info['file_path']
+            )
+        
+        # Get conversation history for context (CONVERSATION MEMORY)
+        conversation_history = get_conversation_messages(conversation_id, user_id, include_attachments=False)
+        
+        # Build messages array with full conversation history
+        messages = [
+            {
+                'role': 'system',
+                'content': 'You are a helpful AI assistant. Provide clear, concise, and friendly responses. You have access to the full conversation history, so you can reference previous messages and maintain context.'
+            }
+        ]
+        
+        # Add conversation history (last 10 messages for context)
+        for msg in conversation_history[-10:]:
+            messages.append({
+                'role': msg['role'],
+                'content': msg['content']
+            })
+        
+        # Prepare AI request with conversation memory
         payload = {
             'model': 'llama-3.3-70b-versatile',
-            'messages': [
-                {
-                    'role': 'system',
-                    'content': 'You are a helpful AI assistant. Provide clear, concise, and friendly responses.'
-                },
-                {
-                    'role': 'user',
-                    'content': user_message
-                }
-            ],
+            'messages': messages,
             'temperature': 0.7,
-            'max_tokens': 1024
+            'max_tokens': 2048
         }
         
         # Call Groq API
@@ -260,17 +362,20 @@ def api_chat():
         
         return jsonify({
             'response': ai_response,
-            'conversation_id': conversation_id
+            'conversation_id': conversation_id,
+            'files': [{'filename': f['original_filename'], 'type': f['file_type']} for f in uploaded_files]
         })
         
     except requests.exceptions.Timeout:
         return jsonify({'error': 'Request timed out. Please try again.'}), 504
     
-    except requests.exceptions.HTTPError:
+    except requests.exceptions.HTTPError as e:
         return jsonify({'error': f'API error: {response.status_code}'}), 500
     
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'An unexpected error occurred.'}), 500
 
 
@@ -368,6 +473,7 @@ if __name__ == '__main__':
     print(f"Debug mode: {config.DEBUG}")
     print(f"Port: 5001")
     print(f"Database: {DATABASE_FILE}")
+    print(f"Upload folder: {UPLOAD_FOLDER}")
     print("="*60 + "\n")
     
     app.run(
