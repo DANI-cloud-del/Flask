@@ -1,0 +1,8 @@
+# Add this route to your app.py after the chat() function:
+
+@app.route('/settings')
+@login_required
+def settings():
+    """Settings page."""
+    user = session.get('user')
+    return render_template('settings.html', user=user)
