@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: flask-ai-chat
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: PYTHON_VERSION
+        value: 3.11.0
+    
+databases:
+  - name: flask-ai-chat-db
+    databaseName: flask_ai_db
+    user: flask_user
+    region: singapore
+    plan: free
