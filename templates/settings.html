@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - AI Assistant{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white border-b border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('chat') }}" class="p-2 hover:bg-gray-100 rounded-lg transition">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                        </svg>
+                    </a>
+                    <h1 class="text-2xl font-bold text-gray-900">Settings</h1>
+                </div>
+                <a href="{{ url_for('logout') }}" class="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition">
+                    Sign Out
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <!-- User Profile Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Profile</h2>
+            <div class="flex items-center space-x-4">
+                {% if user.picture %}
+                <img src="{{ user.picture }}" class="w-16 h-16 rounded-full border-2 border-gray-200" alt="Profile">
+                {% endif %}
+                <div>
+                    <div class="text-lg font-medium text-gray-900">{{ user.name }}</div>
+                    <div class="text-sm text-gray-600">{{ user.email }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Text-to-Speech Settings -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Text-to-Speech</h2>
+                    <p class="text-sm text-gray-600 mt-1">Automatically read AI responses aloud</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="ttsEnabled" class="sr-only peer" onchange="toggleTTS()">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+
+            <!-- TTS Options (shown when enabled) -->
+            <div id="ttsOptions" class="hidden mt-6 space-y-4">
+                <!-- Voice Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Voice</label>
+                    <select id="voiceSelect" onchange="saveVoiceSettings()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="">Loading voices...</option>
+                    </select>
+                </div>
+
+                <!-- Speech Rate -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Speech Rate: <span id="rateValue">1.0</span>x</label>
+                    <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1.0" onchange="saveVoiceSettings()" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Slower</span>
+                        <span>Normal</span>
+                        <span>Faster</span>
+                    </div>
+                </div>
+
+                <!-- Pitch -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pitch: <span id="pitchValue">1.0</span></label>
+                    <input type="range" id="speechPitch" min="0.5" max="2" step="0.1" value="1.0" onchange="saveVoiceSettings()" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Lower</span>
+                        <span>Normal</span>
+                        <span>Higher</span>
+                    </div>
+                </div>
+
+                <!-- Volume -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Volume: <span id="volumeValue">100</span>%</label>
+                    <input type="range" id="speechVolume" min="0" max="100" step="5" value="100" onchange="saveVoiceSettings()" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+
+                <!-- Test Button -->
+                <button onclick="testTTS()" class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center justify-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.414a2 2 0 001.414.586h2a2 2 0 002-2v-6a2 2 0 00-2-2h-2a2 2 0 00-1.414.586l-2.293 2.293a1 1 0 000 1.414l2.293 2.293z"></path>
+                    </svg>
+                    <span>Test Voice</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Auto-read Settings -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Auto-read Responses</h2>
+                    <p class="text-sm text-gray-600 mt-1">Automatically read new AI responses</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="autoReadEnabled" class="sr-only peer" onchange="toggleAutoRead()">
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Theme Settings (Future) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6 opacity-50">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Dark Mode</h2>
+                    <p class="text-sm text-gray-600 mt-1">Coming soon</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-not-allowed">
+                    <input type="checkbox" disabled class="sr-only peer">
+                    <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+            <h2 class="text-lg font-semibold text-red-900 mb-4">Danger Zone</h2>
+            <button onclick="clearAllData()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition">
+                Clear All Conversation History
+            </button>
+            <p class="text-sm text-gray-600 mt-2">This action cannot be undone.</p>
+        </div>
+    </main>
+</div>
+
+<script>
+let availableVoices = [];
+let currentUtterance = null;
+
+// Load settings on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    loadVoices();
+    
+    // Update voice list when available
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = loadVoices;
+    }
+});
+
+// Load voices
+function loadVoices() {
+    availableVoices = speechSynthesis.getVoices();
+    const voiceSelect = document.getElementById('voiceSelect');
+    
+    if (availableVoices.length > 0) {
+        voiceSelect.innerHTML = '';
+        
+        // Group voices by language
+        const englishVoices = availableVoices.filter(v => v.lang.startsWith('en'));
+        const otherVoices = availableVoices.filter(v => !v.lang.startsWith('en'));
+        
+        // Add English voices
+        if (englishVoices.length > 0) {
+            const group = document.createElement('optgroup');
+            group.label = 'English';
+            englishVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                if (voice.default) option.textContent += ' - Default';
+                group.appendChild(option);
+            });
+            voiceSelect.appendChild(group);
+        }
+        
+        // Add other voices
+        if (otherVoices.length > 0) {
+            const group = document.createElement('optgroup');
+            group.label = 'Other Languages';
+            otherVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                group.appendChild(option);
+            });
+            voiceSelect.appendChild(group);
+        }
+        
+        // Load saved voice
+        const savedVoice = localStorage.getItem('tts_voice');
+        if (savedVoice) {
+            voiceSelect.value = savedVoice;
+        }
+    }
+}
+
+// Load settings from localStorage
+function loadSettings() {
+    // TTS enabled
+    const ttsEnabled = localStorage.getItem('tts_enabled') === 'true';
+    document.getElementById('ttsEnabled').checked = ttsEnabled;
+    document.getElementById('ttsOptions').classList.toggle('hidden', !ttsEnabled);
+    
+    // Auto-read enabled
+    const autoReadEnabled = localStorage.getItem('auto_read_enabled') === 'true';
+    document.getElementById('autoReadEnabled').checked = autoReadEnabled;
+    
+    // Speech rate
+    const rate = localStorage.getItem('tts_rate') || '1.0';
+    document.getElementById('speechRate').value = rate;
+    document.getElementById('rateValue').textContent = rate;
+    
+    // Speech pitch
+    const pitch = localStorage.getItem('tts_pitch') || '1.0';
+    document.getElementById('speechPitch').value = pitch;
+    document.getElementById('pitchValue').textContent = pitch;
+    
+    // Speech volume
+    const volume = localStorage.getItem('tts_volume') || '100';
+    document.getElementById('speechVolume').value = volume;
+    document.getElementById('volumeValue').textContent = volume;
+}
+
+// Toggle TTS
+function toggleTTS() {
+    const enabled = document.getElementById('ttsEnabled').checked;
+    localStorage.setItem('tts_enabled', enabled);
+    document.getElementById('ttsOptions').classList.toggle('hidden', !enabled);
+    
+    // Stop any current speech
+    if (!enabled) {
+        speechSynthesis.cancel();
+    }
+}
+
+// Toggle auto-read
+function toggleAutoRead() {
+    const enabled = document.getElementById('autoReadEnabled').checked;
+    localStorage.setItem('auto_read_enabled', enabled);
+}
+
+// Save voice settings
+function saveVoiceSettings() {
+    // Save voice
+    const voiceSelect = document.getElementById('voiceSelect');
+    localStorage.setItem('tts_voice', voiceSelect.value);
+    
+    // Save rate
+    const rate = document.getElementById('speechRate').value;
+    localStorage.setItem('tts_rate', rate);
+    document.getElementById('rateValue').textContent = rate;
+    
+    // Save pitch
+    const pitch = document.getElementById('speechPitch').value;
+    localStorage.setItem('tts_pitch', pitch);
+    document.getElementById('pitchValue').textContent = pitch;
+    
+    // Save volume
+    const volume = document.getElementById('speechVolume').value;
+    localStorage.setItem('tts_volume', volume);
+    document.getElementById('volumeValue').textContent = volume;
+}
+
+// Test TTS
+function testTTS() {
+    // Stop any current speech
+    speechSynthesis.cancel();
+    
+    const text = "Hello! This is a test of the text-to-speech feature. How does it sound?";
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    // Apply settings
+    const voiceName = document.getElementById('voiceSelect').value;
+    const voice = availableVoices.find(v => v.name === voiceName);
+    if (voice) utterance.voice = voice;
+    
+    utterance.rate = parseFloat(document.getElementById('speechRate').value);
+    utterance.pitch = parseFloat(document.getElementById('speechPitch').value);
+    utterance.volume = parseFloat(document.getElementById('speechVolume').value) / 100;
+    
+    speechSynthesis.speak(utterance);
+}
+
+// Clear all data
+async function clearAllData() {
+    if (!confirm('Are you sure you want to delete ALL conversation history? This cannot be undone!')) {
+        return;
+    }
+    
+    if (!confirm('This will permanently delete all your chats. Are you absolutely sure?')) {
+        return;
+    }
+    
+    try {
+        // Get all conversations
+        const response = await fetch('/api/conversations');
+        const data = await response.json();
+        
+        // Delete each conversation
+        for (const conv of data.conversations) {
+            await fetch(`/api/conversations/${conv.id}`, {
+                method: 'DELETE'
+            });
+        }
+        
+        alert('All conversation history has been deleted.');
+        window.location.href = '/chat';
+    } catch (error) {
+        console.error('Failed to clear data:', error);
+        alert('Failed to clear data. Please try again.');
+    }
+}
+</script>
+
+<style>
+input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2563eb;
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2563eb;
+    cursor: pointer;
+    border: none;
+}
+</style>
+{% endblock %}
