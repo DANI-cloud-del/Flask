@@ -3,6 +3,7 @@
 This is the main Flask application that demonstrates:
 - Google OAuth authentication
 - AI chat integration with Groq
+- Chat history storage
 - Session management
 - RESTful API design
 - Modern web UI with Tailwind CSS
@@ -16,7 +17,21 @@ import json
 
 # Import our custom modules
 from config import config
-from database import init_db, get_user_by_google_id, create_user, update_user
+from database import (
+    init_db, 
+    get_user_by_google_id, 
+    create_user, 
+    update_user,
+    get_user_id_by_google_id,
+    create_conversation,
+    get_user_conversations,
+    get_conversation,
+    get_conversation_messages,
+    add_message,
+    delete_conversation,
+    update_conversation_title,
+    generate_conversation_title
+)
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -51,14 +66,7 @@ oauth.register(
 # ============================================================================
 
 def login_required(f):
-    """Decorator to protect routes that require authentication.
-    
-    Usage:
-        @app.route('/protected')
-        @login_required
-        def protected_route():
-            return 'This requires login'
-    """
+    """Decorator to protect routes that require authentication."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
@@ -74,11 +82,7 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    """Landing page.
-    
-    Shows login option if not authenticated.
-    Redirects to chat if already authenticated.
-    """
+    """Landing page."""
     if 'user' in session:
         return redirect(url_for('chat'))
     return render_template('index.html')
@@ -86,27 +90,16 @@ def index():
 
 @app.route('/login')
 def login():
-    """Initiate Google OAuth login flow.
-    
-    Redirects user to Google sign-in page.
-    """
-    # Create the redirect URL for OAuth callback
+    """Initiate Google OAuth login flow."""
     redirect_uri = url_for('authorize', _external=True)
     return oauth.google.authorize_redirect(redirect_uri)
 
 
 @app.route('/authorize')
 def authorize():
-    """OAuth callback route.
-    
-    Google redirects here after user signs in.
-    We receive the authorization code and exchange it for user info.
-    """
+    """OAuth callback route."""
     try:
-        # Get the access token
         token = oauth.google.authorize_access_token()
-        
-        # Get user info from Google
         user_info = token.get('userinfo')
         
         if user_info:
@@ -115,17 +108,13 @@ def authorize():
             name = user_info.get('name')
             picture = user_info.get('picture')
             
-            # Check if user exists in database
             user = get_user_by_google_id(google_id)
             
             if user:
-                # Update existing user info (in case name or picture changed)
                 update_user(google_id, email, name, picture)
             else:
-                # Create new user
                 create_user(google_id, email, name, picture)
             
-            # Store user info in session
             session['user'] = {
                 'google_id': google_id,
                 'email': email,
@@ -147,11 +136,9 @@ def authorize():
 
 @app.route('/logout')
 def logout():
-    """Log out the current user.
-    
-    Clears the session and redirects to home page.
-    """
+    """Log out the current user."""
     session.pop('user', None)
+    session.pop('current_conversation_id', None)
     flash('You have been logged out.', 'info')
     return redirect(url_for('index'))
 
@@ -161,59 +148,79 @@ def logout():
 # ============================================================================
 
 @app.route('/chat')
+@app.route('/chat/<int:conversation_id>')
 @login_required
-def chat():
-    """Chat interface page.
-    
-    Protected route - requires authentication.
-    Displays the AI chat interface.
-    """
+def chat(conversation_id=None):
+    """Chat interface page."""
     user = session.get('user')
-    return render_template('chat.html', user=user)
+    user_id = get_user_id_by_google_id(user['google_id'])
+    
+    # Get user's conversations for sidebar
+    conversations = get_user_conversations(user_id)
+    
+    # If conversation_id provided, load that conversation
+    current_conversation = None
+    messages = []
+    
+    if conversation_id:
+        current_conversation = get_conversation(conversation_id, user_id)
+        if current_conversation:
+            messages = get_conversation_messages(conversation_id, user_id)
+            session['current_conversation_id'] = conversation_id
+    
+    return render_template(
+        'chat.html', 
+        user=user,
+        conversations=conversations,
+        current_conversation=current_conversation,
+        messages=messages
+    )
 
 
 # ============================================================================
-# API ROUTES
+# API ROUTES - CHAT
 # ============================================================================
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
-    """API endpoint for AI chat.
-    
-    Accepts JSON with user message, sends to Groq API, returns AI response.
-    
-    Request JSON:
-        {
-            "message": "User's message text"
-        }
-    
-    Response JSON:
-        {
-            "response": "AI's response text"
-        }
-    
-    Error Response:
-        {
-            "error": "Error message"
-        }
-    """
+    """API endpoint for AI chat with message storage."""
     print("\n" + "="*60)
     print("[DEBUG] API Chat Request Started")
     print("="*60)
     
     try:
-        # Get message from request
+        user = session.get('user')
+        user_id = get_user_id_by_google_id(user['google_id'])
+        
         data = request.get_json()
         user_message = data.get('message', '').strip()
+        conversation_id = data.get('conversation_id')
         
+        print(f"[DEBUG] User ID: {user_id}")
         print(f"[DEBUG] User message: {user_message}")
+        print(f"[DEBUG] Conversation ID: {conversation_id}")
         
         if not user_message:
-            print("[DEBUG] Empty message received")
             return jsonify({'error': 'Message is required'}), 400
         
-        # Prepare request payload
+        # Create new conversation if none exists
+        if not conversation_id:
+            title = generate_conversation_title(user_message)
+            conversation_id = create_conversation(user_id, title)
+            session['current_conversation_id'] = conversation_id
+            print(f"[DEBUG] Created new conversation: {conversation_id}")
+        else:
+            # Verify user owns this conversation
+            conv = get_conversation(conversation_id, user_id)
+            if not conv:
+                return jsonify({'error': 'Invalid conversation'}), 403
+        
+        # Store user message
+        add_message(conversation_id, 'user', user_message)
+        print(f"[DEBUG] Stored user message")
+        
+        # Prepare AI request
         payload = {
             'model': 'llama-3.3-70b-versatile',
             'messages': [
@@ -230,12 +237,9 @@ def api_chat():
             'max_tokens': 1024
         }
         
-        print(f"[DEBUG] Model: {payload['model']}")
-        print(f"[DEBUG] API Key present: {bool(config.GROQ_API_KEY)}")
-        print(f"[DEBUG] API Key starts with: {config.GROQ_API_KEY[:10]}..." if config.GROQ_API_KEY else "[DEBUG] No API key!")
-        print("[DEBUG] Sending request to Groq API...")
+        print(f"[DEBUG] Calling Groq API...")
         
-        # Call Groq API with updated model
+        # Call Groq API
         response = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
             headers={
@@ -246,66 +250,111 @@ def api_chat():
             timeout=30
         )
         
-        print(f"[DEBUG] Response status code: {response.status_code}")
-        print(f"[DEBUG] Response headers: {dict(response.headers)}")
+        print(f"[DEBUG] Response status: {response.status_code}")
         
-        # Try to get response text even if there's an error
-        try:
-            response_data = response.json()
-            print(f"[DEBUG] Response JSON: {json.dumps(response_data, indent=2)}")
-        except Exception as json_error:
-            print(f"[DEBUG] Could not parse JSON response: {json_error}")
-            print(f"[DEBUG] Raw response text: {response.text}")
-            response_data = None
-        
-        # Raise error if status is not 200
         response.raise_for_status()
-        
-        if not response_data:
-            response_data = response.json()
+        result = response.json()
         
         # Extract AI response
-        ai_response = response_data['choices'][0]['message']['content']
-        print(f"[DEBUG] AI response extracted successfully")
-        print(f"[DEBUG] Response length: {len(ai_response)} characters")
+        ai_response = result['choices'][0]['message']['content']
+        print(f"[DEBUG] Got AI response ({len(ai_response)} chars)")
+        
+        # Store AI response
+        add_message(conversation_id, 'assistant', ai_response)
+        print(f"[DEBUG] Stored AI response")
+        
         print("="*60)
         print("[DEBUG] Request completed successfully")
         print("="*60 + "\n")
         
-        return jsonify({'response': ai_response})
+        return jsonify({
+            'response': ai_response,
+            'conversation_id': conversation_id
+        })
         
     except requests.exceptions.Timeout as e:
-        print(f"[ERROR] Request timeout: {e}")
-        print("="*60 + "\n")
+        print(f"[ERROR] Timeout: {e}")
         return jsonify({'error': 'Request timed out. Please try again.'}), 504
     
     except requests.exceptions.HTTPError as e:
         print(f"[ERROR] HTTP Error: {e}")
-        print(f"[ERROR] Status code: {response.status_code}")
         print(f"[ERROR] Response: {response.text}")
-        print("="*60 + "\n")
         return jsonify({'error': f'API error: {response.status_code}'}), 500
-    
-    except requests.exceptions.RequestException as e:
-        print(f"[ERROR] Request exception: {type(e).__name__}")
-        print(f"[ERROR] Details: {e}")
-        print("="*60 + "\n")
-        return jsonify({'error': 'Failed to get AI response. Please try again.'}), 500
-    
-    except KeyError as e:
-        print(f"[ERROR] KeyError - Missing field in response: {e}")
-        if response_data:
-            print(f"[ERROR] Available keys: {list(response_data.keys())}")
-        print("="*60 + "\n")
-        return jsonify({'error': 'Invalid response from AI service.'}), 500
     
     except Exception as e:
         print(f"[ERROR] Unexpected error: {type(e).__name__}")
         print(f"[ERROR] Details: {e}")
         import traceback
         print(f"[ERROR] Traceback:\n{traceback.format_exc()}")
-        print("="*60 + "\n")
         return jsonify({'error': 'An unexpected error occurred.'}), 500
+
+
+# ============================================================================
+# API ROUTES - CONVERSATIONS
+# ============================================================================
+
+@app.route('/api/conversations', methods=['GET'])
+@login_required
+def api_get_conversations():
+    """Get all conversations for the current user."""
+    user = session.get('user')
+    user_id = get_user_id_by_google_id(user['google_id'])
+    conversations = get_user_conversations(user_id)
+    return jsonify({'conversations': conversations})
+
+
+@app.route('/api/conversations/<int:conversation_id>', methods=['GET'])
+@login_required
+def api_get_conversation(conversation_id):
+    """Get a specific conversation with messages."""
+    user = session.get('user')
+    user_id = get_user_id_by_google_id(user['google_id'])
+    
+    conversation = get_conversation(conversation_id, user_id)
+    if not conversation:
+        return jsonify({'error': 'Conversation not found'}), 404
+    
+    messages = get_conversation_messages(conversation_id, user_id)
+    
+    return jsonify({
+        'conversation': conversation,
+        'messages': messages
+    })
+
+
+@app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
+@login_required
+def api_delete_conversation(conversation_id):
+    """Delete a conversation."""
+    user = session.get('user')
+    user_id = get_user_id_by_google_id(user['google_id'])
+    
+    if delete_conversation(conversation_id, user_id):
+        # Clear from session if it's the current one
+        if session.get('current_conversation_id') == conversation_id:
+            session.pop('current_conversation_id', None)
+        return jsonify({'success': True})
+    else:
+        return jsonify({'error': 'Conversation not found'}), 404
+
+
+@app.route('/api/conversations/<int:conversation_id>/title', methods=['PUT'])
+@login_required
+def api_update_conversation_title(conversation_id):
+    """Update conversation title."""
+    user = session.get('user')
+    user_id = get_user_id_by_google_id(user['google_id'])
+    
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+    
+    if update_conversation_title(conversation_id, title, user_id):
+        return jsonify({'success': True})
+    else:
+        return jsonify({'error': 'Conversation not found'}), 404
 
 
 # ============================================================================
@@ -314,13 +363,13 @@ def api_chat():
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors (page not found)."""
+    """Handle 404 errors."""
     return render_template('404.html'), 404
 
 
 @app.errorhandler(500)
 def internal_error(error):
-    """Handle 500 errors (internal server error)."""
+    """Handle 500 errors."""
     return render_template('500.html'), 500
 
 
@@ -329,18 +378,17 @@ def internal_error(error):
 # ============================================================================
 
 if __name__ == '__main__':
-    # Run the Flask development server
-    # WARNING: Do not use in production! Use Gunicorn or similar.
     print("\n" + "="*60)
     print("Flask AI Workshop - Starting Server")
     print("="*60)
     print(f"Debug mode: {config.DEBUG}")
     print(f"Port: 5001")
     print(f"Groq API Key configured: {bool(config.GROQ_API_KEY)}")
+    print(f"Database: {DATABASE_FILE if 'DATABASE_FILE' in dir() else 'database.db'}")
     print("="*60 + "\n")
     
     app.run(
         debug=config.DEBUG,
-        host='0.0.0.0',  # Allow external connections
-        port=5001  # Updated to 5001 to match OAuth setup
+        host='0.0.0.0',
+        port=5001
     )
