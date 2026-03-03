@@ -1,0 +1,95 @@
+/* Dark Mode CSS Variables and Styles */
+
+:root {
+    /* Light Mode Colors */
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F9FAFB;
+    --bg-tertiary: #F3F4F6;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+    --border-color: #E5E7EB;
+    --hover-bg: #F3F4F6;
+    --input-bg: #FFFFFF;
+    --shadow: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+    /* Dark Mode Colors */
+    --bg-primary: #1F2937;
+    --bg-secondary: #111827;
+    --bg-tertiary: #374151;
+    --text-primary: #F9FAFB;
+    --text-secondary: #D1D5DB;
+    --text-muted: #9CA3AF;
+    --border-color: #374151;
+    --hover-bg: #374151;
+    --input-bg: #374151;
+    --shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* Apply dark mode colors */
+[data-theme="dark"] body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .bg-white {
+    background-color: var(--bg-secondary) !important;
+}
+
+[data-theme="dark"] .bg-gray-50 {
+    background-color: var(--bg-tertiary) !important;
+}
+
+[data-theme="dark"] .bg-gray-100 {
+    background-color: var(--hover-bg) !important;
+}
+
+[data-theme="dark"] .text-gray-900 {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .text-gray-800 {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .text-gray-700 {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .text-gray-600 {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .text-gray-500 {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .text-gray-400 {
+    color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .border-gray-200 {
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .border-gray-300 {
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] textarea {
+    background-color: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] ::placeholder {
+    color: var(--text-muted) !important;
+}
+
+/* Smooth transition for theme changes */
+body, .bg-white, .bg-gray-50, .text-gray-900, input, textarea {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
