@@ -23,13 +23,12 @@ def get_db():
             cursor = conn.cursor()
             cursor.execute('SELECT * FROM users')
     """
-    conn = sqlite3.connect(DATABASE_FILE)
+    conn = sqlite3.connect(DATABASE_FILE, timeout=30.0)
     conn.row_factory = sqlite3.Row  # Enable column access by name
+    conn.isolation_level = None  # Autocommit mode
     try:
         yield conn
-        conn.commit()
     except Exception as e:
-        conn.rollback()
         raise e
     finally:
         conn.close()
@@ -231,15 +230,22 @@ def add_message(conversation_id, role, content):
     """
     with get_db() as conn:
         cursor = conn.cursor()
+        
+        # Insert message
         cursor.execute('''
             INSERT INTO messages (conversation_id, role, content)
             VALUES (?, ?, ?)
         ''', (conversation_id, role, content))
+        message_id = cursor.lastrowid
         
-        # Update conversation timestamp
-        update_conversation_timestamp(conversation_id)
+        # Update conversation timestamp in same connection
+        cursor.execute('''
+            UPDATE conversations 
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (conversation_id,))
         
-        return cursor.lastrowid
+        return message_id
 
 
 def get_conversation_messages(conversation_id, user_id):
