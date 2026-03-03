@@ -30,7 +30,8 @@ from database import (
     add_message,
     delete_conversation,
     update_conversation_title,
-    generate_conversation_title
+    generate_conversation_title,
+    DATABASE_FILE
 )
 
 # Initialize Flask app
@@ -384,7 +385,7 @@ if __name__ == '__main__':
     print(f"Debug mode: {config.DEBUG}")
     print(f"Port: 5001")
     print(f"Groq API Key configured: {bool(config.GROQ_API_KEY)}")
-    print(f"Database: {DATABASE_FILE if 'DATABASE_FILE' in dir() else 'database.db'}")
+    print(f"Database: {DATABASE_FILE}")
     print("="*60 + "\n")
     
     app.run(
