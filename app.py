@@ -153,11 +153,15 @@ def authorize():
             name = user_info.get('name')
             picture = user_info.get('picture')
             
+            print(f"[AUTH] User logging in: {email}")
+            
             user = get_user_by_google_id(google_id)
             
             if user:
+                print(f"[AUTH] Existing user found: {user['id']}")
                 update_user(google_id, email, name, picture)
             else:
+                print(f"[AUTH] Creating new user")
                 create_user(google_id, email, name, picture)
             
             session['user'] = {
@@ -167,6 +171,8 @@ def authorize():
                 'picture': picture
             }
             
+            print(f"[AUTH] Session created for {email}")
+            
             flash(f'Welcome, {name}!', 'success')
             return redirect(url_for('chat'))
         else:
@@ -174,7 +180,7 @@ def authorize():
             return redirect(url_for('index'))
             
     except Exception as e:
-        print(f"OAuth error: {e}")
+        print(f"[AUTH ERROR] {e}")
         flash('Authentication failed. Please try again.', 'error')
         return redirect(url_for('index'))
 
@@ -199,6 +205,8 @@ def chat(conversation_id=None):
     """Chat interface page."""
     user = session.get('user')
     user_id = get_user_id_by_google_id(user['google_id'])
+    
+    print(f"[CHAT] User: {user.get('email')}, ID: {user_id}")
     
     conversations = get_user_conversations(user_id)
     current_conversation = None
@@ -251,7 +259,18 @@ def api_chat():
     """
     try:
         user = session.get('user')
+        print(f"\n[API CHAT] User from session: {user}")
+        
+        if not user or 'google_id' not in user:
+            print("[API CHAT ERROR] No user in session or missing google_id")
+            return jsonify({'error': 'Session expired. Please log in again.'}), 401
+        
         user_id = get_user_id_by_google_id(user['google_id'])
+        print(f"[API CHAT] User ID from DB: {user_id}")
+        
+        if not user_id:
+            print(f"[API CHAT ERROR] No user_id found for google_id: {user['google_id']}")
+            return jsonify({'error': 'User not found. Please log in again.'}), 401
         
         # Handle file upload (FormData)
         uploaded_files = []
@@ -278,6 +297,7 @@ def api_chat():
                 })
                 
                 file_context = process_file_for_ai(file_path, file_type)
+                print(f"[API CHAT] File uploaded: {filename}")
         
         # Get message and conversation_id from either JSON or FormData
         if request.is_json:
@@ -288,19 +308,26 @@ def api_chat():
             user_message = request.form.get('message', '').strip()
             conversation_id = request.form.get('conversation_id')
         
+        print(f"[API CHAT] Message: '{user_message[:50]}...', Conv ID: {conversation_id}")
+        
         if not user_message and not uploaded_files:
             return jsonify({'error': 'Message or file is required'}), 400
         
         # Create new conversation if none exists
         if not conversation_id:
             title = generate_conversation_title(user_message or "File upload")
+            print(f"[API CHAT] Creating new conversation: '{title}'")
+            print(f"[API CHAT] With user_id: {user_id}")
             conversation_id = create_conversation(user_id, title)
+            print(f"[API CHAT] Created conversation ID: {conversation_id}")
             session['current_conversation_id'] = conversation_id
         else:
             conversation_id = int(conversation_id)
             conv = get_conversation(conversation_id, user_id)
             if not conv:
+                print(f"[API CHAT ERROR] Invalid conversation: {conversation_id}")
                 return jsonify({'error': 'Invalid conversation'}), 403
+            print(f"[API CHAT] Using existing conversation: {conversation_id}")
         
         # Build message content
         full_message = user_message
@@ -309,6 +336,7 @@ def api_chat():
         
         # Store user message
         message_id = add_message(conversation_id, 'user', full_message, has_attachment=bool(uploaded_files))
+        print(f"[API CHAT] Stored user message ID: {message_id}")
         
         # Store attachments
         for file_info in uploaded_files:
@@ -323,6 +351,7 @@ def api_chat():
         
         # Get conversation history for context (CONVERSATION MEMORY)
         conversation_history = get_conversation_messages(conversation_id, user_id, include_attachments=False)
+        print(f"[API CHAT] Conversation history: {len(conversation_history)} messages")
         
         # Build messages array with full conversation history
         messages = [
@@ -339,6 +368,8 @@ def api_chat():
                 'content': msg['content']
             })
         
+        print(f"[API CHAT] Sending {len(messages)} messages to AI")
+        
         # Prepare AI request with conversation memory
         payload = {
             'model': 'llama-3.3-70b-versatile',
@@ -348,6 +379,7 @@ def api_chat():
         }
         
         # Call Groq API
+        print(f"[API CHAT] Calling Groq API...")
         response = requests.post(
             'https://api.groq.com/openai/v1/chat/completions',
             headers={
@@ -363,9 +395,11 @@ def api_chat():
         
         # Extract AI response
         ai_response = result['choices'][0]['message']['content']
+        print(f"[API CHAT] AI response received: {len(ai_response)} chars")
         
         # Store AI response
         add_message(conversation_id, 'assistant', ai_response)
+        print(f"[API CHAT] Stored AI response")
         
         return jsonify({
             'response': ai_response,
@@ -374,16 +408,18 @@ def api_chat():
         })
         
     except requests.exceptions.Timeout:
+        print(f"[API CHAT ERROR] Timeout")
         return jsonify({'error': 'Request timed out. Please try again.'}), 504
     
     except requests.exceptions.HTTPError as e:
+        print(f"[API CHAT ERROR] HTTP Error: {e}")
         return jsonify({'error': f'API error: {response.status_code}'}), 500
     
     except Exception as e:
-        print(f"Error in api_chat: {e}")
+        print(f"[API CHAT ERROR] Exception: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'An unexpected error occurred.'}), 500
+        return jsonify({'error': f'An unexpected error occurred: {str(e)}'}), 500
 
 
 # ============================================================================
@@ -419,7 +455,7 @@ def api_get_conversation(conversation_id):
             'messages': messages
         })
     except Exception as e:
-        print(f"Error in api_get_conversation: {e}")
+        print(f"[API ERROR] get_conversation: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Database error'}), 500
@@ -472,7 +508,7 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors."""
-    print(f"500 Error: {error}")
+    print(f"[500 ERROR] {error}")
     import traceback
     traceback.print_exc()
     return jsonify({'error': 'Internal server error'}), 500
