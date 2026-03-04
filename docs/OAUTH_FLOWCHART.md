@@ -8,8 +8,8 @@ flowchart TD
     CheckSession -->|Yes| Chat[Show Chat Page]
     CheckSession -->|No| Landing[Show Landing Page]
     
-    Landing --> ClickLogin[User clicks 'Sign in with Google']
-    ClickLogin --> LoginRoute["/login route"]
+    Landing --> ClickLogin[User clicks Sign in with Google]
+    ClickLogin --> LoginRoute[/login route]
     LoginRoute --> RedirectGoogle[Redirect to Google]
     
     RedirectGoogle --> GoogleLogin[Google Login Page]
@@ -20,7 +20,7 @@ flowchart TD
     GoogleError --> GoogleLogin
     
     GoogleVerify -->|Valid| GoogleCallback[Google redirects with code]
-    GoogleCallback --> AuthorizeRoute["/authorize route"]
+    GoogleCallback --> AuthorizeRoute[/authorize route]
     
     AuthorizeRoute --> ExchangeToken[Exchange code for token]
     ExchangeToken --> GetUserInfo[Get user info from token]
@@ -36,8 +36,8 @@ flowchart TD
     RedirectChat --> Chat
     
     Chat --> UserAction{User action}
-    UserAction -->|Send message| APIChat["/api/chat"]
-    UserAction -->|Logout| LogoutRoute["/logout"]
+    UserAction -->|Send message| APIChat[/api/chat]
+    UserAction -->|Logout| LogoutRoute[/logout]
     UserAction -->|Close browser| SessionPersists[Session persists]
     
     LogoutRoute --> ClearSession[Clear session]
@@ -64,9 +64,9 @@ sequenceDiagram
     participant Google
     participant DB as Database
     
-    User->>Browser: Visit http://localhost:5001/
+    User->>Browser: Visit localhost:5001
     Browser->>Flask: GET /
-    Flask->>Flask: Check session['user']
+    Flask->>Flask: Check session user
     
     alt User logged in
         Flask->>Browser: Redirect to /chat
@@ -74,15 +74,15 @@ sequenceDiagram
         Flask->>Browser: Show landing page with login button
     end
     
-    User->>Browser: Click "Sign in with Google"
+    User->>Browser: Click Sign in with Google
     Browser->>Flask: GET /login
     Flask->>Flask: Generate redirect_uri
     Flask->>Browser: Redirect to Google OAuth
     
-    Browser->>Google: GET https://accounts.google.com/o/oauth2/v2/auth
+    Browser->>Google: GET oauth2/v2/auth
     Google->>Browser: Show Google Login Page
     
-    User->>Google: Enter email & password
+    User->>Google: Enter email and password
     Google->>Google: Verify credentials
     Google->>Browser: Redirect to /authorize?code=ABC123
     
@@ -90,36 +90,36 @@ sequenceDiagram
     Flask->>Google: Exchange code for access token
     Google->>Flask: Return token + userinfo
     
-    Flask->>Flask: Extract user data (email, name, picture, google_id)
-    Flask->>DB: SELECT * FROM users WHERE google_id = ?
+    Flask->>Flask: Extract user data
+    Flask->>DB: SELECT FROM users WHERE google_id
     
     alt User exists
         DB->>Flask: Return user data
-        Flask->>DB: UPDATE user SET email, name, picture, last_login
-    else User doesn't exist
+        Flask->>DB: UPDATE user info
+    else User does not exist
         DB->>Flask: Return null
-        Flask->>DB: INSERT INTO users (google_id, email, name, picture)
+        Flask->>DB: INSERT INTO users
     end
     
-    Flask->>Flask: session['user'] = {google_id, email, name, picture}
-    Flask->>Browser: Set-Cookie: session=encrypted_data
+    Flask->>Flask: Create session cookie
+    Flask->>Browser: Set-Cookie session data
     Flask->>Browser: Redirect to /chat
     
-    Browser->>Flask: GET /chat (with session cookie)
-    Flask->>Flask: @login_required checks session
-    Flask->>Flask: 'user' in session? ✅ Yes
+    Browser->>Flask: GET /chat with session cookie
+    Flask->>Flask: Check login_required
+    Flask->>Flask: User in session - Yes
     Flask->>Browser: Render chat.html with user data
 ```
 
 ---
 
-## 🛡️ Authentication Guard (@login_required) Flow
+## 🛡️ Authentication Guard Flow
 
 ```mermaid
 flowchart TD
-    Start([User requests protected route]) --> Decorator[@login_required decorator runs]
+    Start([User requests protected route]) --> Decorator[login_required decorator runs]
     
-    Decorator --> CheckSession{Is 'user' in session?}
+    Decorator --> CheckSession{Is user in session?}
     
     CheckSession -->|No| Flash[Flash warning message]
     Flash --> RedirectHome[Redirect to /]
@@ -142,7 +142,7 @@ flowchart TD
 stateDiagram-v2
     [*] --> NoSession: User visits site
     
-    NoSession --> Authenticating: Click "Sign in"
+    NoSession --> Authenticating: Click Sign in
     Authenticating --> OAuthFlow: Redirect to Google
     OAuthFlow --> Authenticating: Google callback
     Authenticating --> SessionCreated: Create session cookie
@@ -151,10 +151,10 @@ stateDiagram-v2
     
     Active --> Active: Browse pages
     Active --> Active: Send messages
-    Active --> Active: Close/reopen browser (cookie persists)
+    Active --> Active: Close and reopen browser
     
     Active --> NoSession: Click logout
-    Active --> NoSession: Session expires (rare)
+    Active --> NoSession: Session expires
     Active --> NoSession: Clear cookies
     
     NoSession --> [*]
@@ -162,16 +162,16 @@ stateDiagram-v2
 
 ---
 
-## 📡 API Chat Request Flow (with Authentication)
+## 📡 API Chat Request Flow
 
 ```mermaid
 flowchart TD
     Start([User sends message]) --> Frontend[Frontend JavaScript]
     Frontend --> PrepareData[Prepare request data]
-    PrepareData --> SendRequest[POST /api/chat]
+    PrepareData --> SendRequest[POST to /api/chat]
     
     SendRequest --> FlaskReceives[Flask receives request]
-    FlaskReceives --> CheckAuth{@login_required}
+    FlaskReceives --> CheckAuth{login_required check}
     
     CheckAuth -->|No session| Return401[Return 401 Unauthorized]
     Return401 --> ShowError[Show error to user]
@@ -209,29 +209,18 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph "OAuth Callback"
-        A[Get user info from Google] --> B{Check if user exists}
-    end
+    A[Get user info from Google] --> B{Check if user exists}
+    B -->|Query| C[SELECT FROM users WHERE google_id]
     
-    subgraph "Database Query"
-        B -->|Query| C[SELECT * FROM users<br/>WHERE google_id = ?]
-    end
+    C -->|Found| D[UPDATE users SET email name picture]
+    C -->|Not Found| E[INSERT INTO users]
     
-    subgraph "User Exists Path"
-        C -->|Found| D[UPDATE users<br/>SET email, name, picture, last_login<br/>WHERE google_id = ?]
-        D --> G[Return user_id]
-    end
+    D --> G[Return user_id]
+    E --> F[Get newly created user_id]
+    F --> G
     
-    subgraph "New User Path"
-        C -->|Not Found| E[INSERT INTO users<br/>google_id, email, name, picture]
-        E --> F[Get newly created user_id]
-        F --> G
-    end
-    
-    subgraph "Session Creation"
-        G --> H[Create session cookie]
-        H --> I[Redirect to /chat]
-    end
+    G --> H[Create session cookie]
+    H --> I[Redirect to /chat]
     
     style D fill:#4dabf7
     style E fill:#51cf66
@@ -244,36 +233,18 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph "Public Routes (No Auth Required)"
-        A1[/ - Landing page]
-        A2[/login - Start OAuth]
-        A3[/authorize - OAuth callback]
-    end
+    A1[/ - Landing page] --> NoAuth[Accessible to everyone]
+    A2[/login - Start OAuth] --> NoAuth
+    A3[/authorize - OAuth callback] --> NoAuth
     
-    subgraph "Protected Routes (@login_required)"
-        B1[/chat - Chat interface]
-        B2[/settings - Settings page]
-        B3[/api/chat - Send message]
-        B4[/api/conversations - Get conversations]
-        B5[/logout - End session]
-    end
+    B1[/chat - Chat interface] --> C{session user exists?}
+    B2[/settings - Settings page] --> C
+    B3[/api/chat - Send message] --> C
+    B4[/api/conversations - Get conversations] --> C
+    B5[/logout - End session] --> C
     
-    subgraph "Session Check"
-        C{session['user']<br/>exists?}
-    end
-    
-    A1 --> NoAuth[Accessible to everyone]
-    A2 --> NoAuth
-    A3 --> NoAuth
-    
-    B1 --> C
-    B2 --> C
-    B3 --> C
-    B4 --> C
-    B5 --> C
-    
-    C -->|Yes| Allow[✅ Allow access]
-    C -->|No| Block[❌ Redirect to /]
+    C -->|Yes| Allow[Allow access]
+    C -->|No| Block[Redirect to /]
     
     style A1 fill:#51cf66
     style A2 fill:#51cf66
@@ -291,34 +262,26 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph "Login Process"
-        A[User authenticates via Google] --> B[Flask receives user info]
-        B --> C[Create session dictionary]
-        C --> D["session['user'] = {<br/>google_id, email, name, picture<br/>}"]
-    end
+    A[User authenticates via Google] --> B[Flask receives user info]
+    B --> C[Create session dictionary]
+    C --> D[Set session user data]
     
-    subgraph "Flask Session Handling"
-        D --> E[Serialize to JSON]
-        E --> F[Encrypt with SECRET_KEY]
-        F --> G[Base64 encode]
-    end
+    D --> E[Serialize to JSON]
+    E --> F[Encrypt with SECRET_KEY]
+    F --> G[Base64 encode]
     
-    subgraph "Browser"
-        G --> H[Set-Cookie header]
-        H --> I[Browser stores cookie]
-        I --> J[Cookie sent with every request]
-    end
+    G --> H[Set-Cookie header]
+    H --> I[Browser stores cookie]
+    I --> J[Cookie sent with every request]
     
-    subgraph "Subsequent Requests"
-        J --> K[Flask receives Cookie header]
-        K --> L[Decode Base64]
-        L --> M[Decrypt with SECRET_KEY]
-        M --> N[Deserialize JSON]
-        N --> O["session['user'] available<br/>in Python code"]
-    end
+    J --> K[Flask receives Cookie header]
+    K --> L[Decode Base64]
+    L --> M[Decrypt with SECRET_KEY]
+    M --> N[Deserialize JSON]
+    N --> O[session user available in Python]
     
     O --> P{Route needs auth?}
-    P -->|Yes| Q[@login_required checks session]
+    P -->|Yes| Q[login_required checks session]
     P -->|No| R[Execute route normally]
     
     style D fill:#4dabf7
@@ -329,7 +292,7 @@ flowchart TD
 
 ---
 
-## 🔄 Complete User Journey (First Time User)
+## 🔄 User Journey Map
 
 ```mermaid
 journey
@@ -339,7 +302,7 @@ journey
       See landing page: 5: User
       Read about features: 4: User
     section Authentication
-      Click "Sign in with Google": 5: User
+      Click Sign in with Google: 5: User
       Redirected to Google: 3: System
       Enter Google credentials: 4: User
       Google verifies: 5: Google
@@ -353,75 +316,44 @@ journey
       Receive AI response: 5: User, AI
     section Return Visit
       Close browser: 5: User
-      Reopen app (same day): 5: User
-      Still logged in (cookie persists): 5: System
+      Reopen app: 5: User
+      Still logged in: 5: System
       Continue chatting: 5: User
 ```
 
 ---
 
-## 🔐 Security Layers Visualization
+## 🔐 Security Layers
 
 ```mermaid
 flowchart TB
-    subgraph "Layer 1: OAuth (Google)"
-        A[Google verifies user identity]
-        A1[No password stored in your app]
-        A2[User can revoke access anytime]
-    end
-    
-    subgraph "Layer 2: Session Encryption"
-        B[Session data encrypted with SECRET_KEY]
-        B1[Cookie signed to prevent tampering]
-        B2[HttpOnly flag prevents JS access]
-    end
-    
-    subgraph "Layer 3: Route Protection"
-        C[@login_required decorator]
-        C1[Checks session before every protected route]
-        C2[Blocks unauthenticated requests]
-    end
-    
-    subgraph "Layer 4: Database Security"
-        D[User lookup by google_id (not email)]
-        D1[Permanent identifier]
-        D2[Foreign key constraints]
-    end
-    
-    subgraph "Layer 5: API Validation"
-        E[Verify user owns resources]
-        E1[Check conversation ownership]
-        E2[Validate user_id matches session]
-    end
-    
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F[✅ Secure Access Granted]
+    A[Google verifies user identity] --> B[Session data encrypted]
+    B --> C[login_required decorator]
+    C --> D[User lookup by google_id]
+    D --> E[Verify user owns resources]
+    E --> F[Secure Access Granted]
     
     style F fill:#51cf66
+    style A fill:#4285f4
+    style B fill:#ffd93d
+    style C fill:#ff6b6b
 ```
 
 ---
 
-## 🎭 Comparison: With vs Without Authentication
+## 🎭 With vs Without Authentication
 
 ```mermaid
 flowchart LR
-    subgraph "Without Auth (Insecure)"
-        N1[Anyone can access /chat] --> N2[No user identification]
-        N2 --> N3[All conversations shared]
-        N3 --> N4[No privacy]
-        N4 --> N5[❌ Security risk]
-    end
+    N1[Anyone can access chat] --> N2[No user identification]
+    N2 --> N3[All conversations shared]
+    N3 --> N4[No privacy]
+    N4 --> N5[Security risk]
     
-    subgraph "With Auth (Your App)"
-        Y1[Must login to access /chat] --> Y2[User identified by google_id]
-        Y2 --> Y3[Personal conversations only]
-        Y3 --> Y4[Data privacy maintained]
-        Y4 --> Y5[✅ Secure & private]
-    end
+    Y1[Must login to access chat] --> Y2[User identified by google_id]
+    Y2 --> Y3[Personal conversations only]
+    Y3 --> Y4[Data privacy maintained]
+    Y4 --> Y5[Secure and private]
     
     style N5 fill:#ff6b6b
     style Y5 fill:#51cf66
@@ -429,7 +361,7 @@ flowchart LR
 
 ---
 
-## 🧪 Testing Authentication Flow
+## 🧪 Testing Authentication
 
 ```mermaid
 flowchart TD
@@ -437,31 +369,31 @@ flowchart TD
     
     Test1 --> Test2[Try accessing /chat directly]
     Test2 --> Check1{Redirected to /?}
-    Check1 -->|Yes| Pass1[✅ Test 1 Passed]
-    Check1 -->|No| Fail1[❌ Auth not working]
+    Check1 -->|Yes| Pass1[Test 1 Passed]
+    Check1 -->|No| Fail1[Auth not working]
     
-    Pass1 --> Test3[Click 'Sign in with Google']
+    Pass1 --> Test3[Click Sign in with Google]
     Test3 --> Test4[Complete Google login]
     Test4 --> Check2{Redirected to /chat?}
-    Check2 -->|Yes| Pass2[✅ Test 2 Passed]
-    Check2 -->|No| Fail2[❌ OAuth not working]
+    Check2 -->|Yes| Pass2[Test 2 Passed]
+    Check2 -->|No| Fail2[OAuth not working]
     
     Pass2 --> Test5[Check session cookie in DevTools]
     Test5 --> Check3{Cookie exists?}
-    Check3 -->|Yes| Pass3[✅ Test 3 Passed]
-    Check3 -->|No| Fail3[❌ Session not created]
+    Check3 -->|Yes| Pass3[Test 3 Passed]
+    Check3 -->|No| Fail3[Session not created]
     
     Pass3 --> Test6[Send a chat message]
     Test6 --> Check4{Message sent successfully?}
-    Check4 -->|Yes| Pass4[✅ Test 4 Passed]
-    Check4 -->|No| Fail4[❌ API auth issue]
+    Check4 -->|Yes| Pass4[Test 4 Passed]
+    Check4 -->|No| Fail4[API auth issue]
     
     Pass4 --> Test7[Click logout]
     Test7 --> Check5{Session cleared?}
-    Check5 -->|Yes| Pass5[✅ All Tests Passed! 🎉]
-    Check5 -->|No| Fail5[❌ Logout not working]
+    Check5 -->|Yes| Pass5[All Tests Passed]
+    Check5 -->|No| Fail5[Logout not working]
     
-    Fail1 --> Debug[Check @login_required]
+    Fail1 --> Debug[Check login_required]
     Fail2 --> Debug
     Fail3 --> Debug
     Fail4 --> Debug
@@ -480,7 +412,7 @@ flowchart TD
 
 ---
 
-## 📊 Data Flow: User Login to First Message
+## 📊 Login to First Message Flow
 
 ```mermaid
 flowchart TD
@@ -500,16 +432,16 @@ flowchart TD
     J --> L[Get user_id]
     K --> L
     
-    L --> M["session['user'] = {...}"]
+    L --> M[Create session]
     M --> N[Redirect to /chat]
     N --> O[Load chat interface]
     
     O --> P[User types message]
     P --> Q[POST /api/chat]
-    Q --> R[@login_required]
+    Q --> R[login_required check]
     R --> S[Get user from session]
     S --> T[Get user_id from DB]
-    T --> U[Create/get conversation_id]
+    T --> U[Create or get conversation_id]
     U --> V[INSERT message into DB]
     V --> W[Call Groq API]
     W --> X[Save AI response to DB]
@@ -524,14 +456,14 @@ flowchart TD
 
 ---
 
-## 🎯 Quick Reference: Authentication Checkpoints
+## 🎯 Authentication System Overview
 
 ```mermaid
 mindmap
-  root((Authentication<br/>System))
+  root((Authentication System))
     Google OAuth
-      /login starts flow
-      /authorize receives callback
+      login starts flow
+      authorize receives callback
       Exchange code for token
       Get user info
     Session Management
@@ -540,7 +472,7 @@ mindmap
       Persists across requests
       Cleared on logout
     Route Protection
-      @login_required decorator
+      login_required decorator
       Checks session user
       Redirects if not authenticated
       Works on routes and APIs
@@ -558,14 +490,14 @@ mindmap
 
 ---
 
-## 📝 Summary Diagram
+## 📝 Summary
 
 ```mermaid
 flowchart LR
-    A[🌐 Google OAuth] --> B[🍪 Session Cookie]
-    B --> C[🛡️ @login_required]
-    C --> D[💾 Database]
-    D --> E[✅ Authenticated Access]
+    A[Google OAuth] --> B[Session Cookie]
+    B --> C[login_required]
+    C --> D[Database]
+    D --> E[Authenticated Access]
     
     style A fill:#4285f4
     style B fill:#ffd93d
@@ -576,14 +508,26 @@ flowchart LR
 
 ---
 
-**All these diagrams visually explain your authentication system!** 🎨
+## 🎨 Key Points
 
-The flowcharts show:
-- ✅ Complete OAuth flow
-- ✅ Session management
-- ✅ Route protection
-- ✅ Database operations
-- ✅ Security layers
-- ✅ Testing procedures
+**These flowcharts visually explain your authentication system:**
 
-**View on GitHub with proper Mermaid rendering!** 🚀
+- ✅ Complete OAuth flow from login to chat
+- ✅ Session management and cookies
+- ✅ Route protection with decorators
+- ✅ Database operations during auth
+- ✅ Security layers and validation
+- ✅ Testing procedures step-by-step
+- ✅ User journey from discovery to return visits
+
+**All diagrams use proper Mermaid syntax and should render correctly on GitHub!** 🚀
+
+---
+
+## 💡 Tips for Viewing
+
+1. **Best view:** On GitHub - diagrams render automatically
+2. **VS Code:** Install "Markdown Preview Mermaid Support" extension
+3. **Local:** Use any Mermaid-compatible Markdown viewer
+
+**GitHub will render all these diagrams beautifully!** ✨
