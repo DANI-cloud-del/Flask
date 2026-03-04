@@ -9,7 +9,7 @@ flowchart TD
     CheckSession -->|No| Landing[Show Landing Page]
     
     Landing --> ClickLogin[User clicks Sign in with Google]
-    ClickLogin --> LoginRoute[/login route]
+    ClickLogin --> LoginRoute[login route]
     LoginRoute --> RedirectGoogle[Redirect to Google]
     
     RedirectGoogle --> GoogleLogin[Google Login Page]
@@ -20,7 +20,7 @@ flowchart TD
     GoogleError --> GoogleLogin
     
     GoogleVerify -->|Valid| GoogleCallback[Google redirects with code]
-    GoogleCallback --> AuthorizeRoute[/authorize route]
+    GoogleCallback --> AuthorizeRoute[authorize route]
     
     AuthorizeRoute --> ExchangeToken[Exchange code for token]
     ExchangeToken --> GetUserInfo[Get user info from token]
@@ -32,12 +32,12 @@ flowchart TD
     UpdateUser --> CreateSession[Create session cookie]
     CreateUser --> CreateSession
     
-    CreateSession --> RedirectChat[Redirect to /chat]
+    CreateSession --> RedirectChat[Redirect to chat]
     RedirectChat --> Chat
     
     Chat --> UserAction{User action}
-    UserAction -->|Send message| APIChat[/api/chat]
-    UserAction -->|Logout| LogoutRoute[/logout]
+    UserAction -->|Send message| APIChat[api chat endpoint]
+    UserAction -->|Logout| LogoutRoute[logout route]
     UserAction -->|Close browser| SessionPersists[Session persists]
     
     LogoutRoute --> ClearSession[Clear session]
@@ -122,12 +122,12 @@ flowchart TD
     Decorator --> CheckSession{Is user in session?}
     
     CheckSession -->|No| Flash[Flash warning message]
-    Flash --> RedirectHome[Redirect to /]
+    Flash --> RedirectHome[Redirect to home]
     RedirectHome --> ShowLogin[Show login page]
     
     CheckSession -->|Yes| ExtractUser[Extract user from session]
     ExtractUser --> RunFunction[Execute route function]
-    RunFunction --> ReturnResponse[Return page/data to user]
+    RunFunction --> ReturnResponse[Return page or data to user]
     
     style CheckSession fill:#ff6b6b
     style RunFunction fill:#51cf66
@@ -168,7 +168,7 @@ stateDiagram-v2
 flowchart TD
     Start([User sends message]) --> Frontend[Frontend JavaScript]
     Frontend --> PrepareData[Prepare request data]
-    PrepareData --> SendRequest[POST to /api/chat]
+    PrepareData --> SendRequest[POST to api chat]
     
     SendRequest --> FlaskReceives[Flask receives request]
     FlaskReceives --> CheckAuth{login_required check}
@@ -208,8 +208,9 @@ flowchart TD
 ## 🗄️ Database Operations During Auth
 
 ```mermaid
-flowchart LR
+flowchart TD
     A[Get user info from Google] --> B{Check if user exists}
+    
     B -->|Query| C[SELECT FROM users WHERE google_id]
     
     C -->|Found| D[UPDATE users SET email name picture]
@@ -220,7 +221,7 @@ flowchart LR
     F --> G
     
     G --> H[Create session cookie]
-    H --> I[Redirect to /chat]
+    H --> I[Redirect to chat]
     
     style D fill:#4dabf7
     style E fill:#51cf66
@@ -233,18 +234,18 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    A1[/ - Landing page] --> NoAuth[Accessible to everyone]
-    A2[/login - Start OAuth] --> NoAuth
-    A3[/authorize - OAuth callback] --> NoAuth
+    A1[Landing page route] --> NoAuth[Accessible to everyone]
+    A2[Login route] --> NoAuth
+    A3[Authorize route] --> NoAuth
     
-    B1[/chat - Chat interface] --> C{session user exists?}
-    B2[/settings - Settings page] --> C
-    B3[/api/chat - Send message] --> C
-    B4[/api/conversations - Get conversations] --> C
-    B5[/logout - End session] --> C
+    B1[Chat interface route] --> C{session user exists?}
+    B2[Settings page route] --> C
+    B3[API chat route] --> C
+    B4[API conversations route] --> C
+    B5[Logout route] --> C
     
     C -->|Yes| Allow[Allow access]
-    C -->|No| Block[Redirect to /]
+    C -->|No| Block[Redirect to home]
     
     style A1 fill:#51cf66
     style A2 fill:#51cf66
@@ -344,16 +345,22 @@ flowchart TB
 ## 🎭 With vs Without Authentication
 
 ```mermaid
-flowchart LR
-    N1[Anyone can access chat] --> N2[No user identification]
-    N2 --> N3[All conversations shared]
-    N3 --> N4[No privacy]
-    N4 --> N5[Security risk]
+flowchart TD
+    subgraph Without["Without Auth - Insecure"]
+        N1[Anyone can access chat]
+        N1 --> N2[No user identification]
+        N2 --> N3[All conversations shared]
+        N3 --> N4[No privacy]
+        N4 --> N5[Security risk]
+    end
     
-    Y1[Must login to access chat] --> Y2[User identified by google_id]
-    Y2 --> Y3[Personal conversations only]
-    Y3 --> Y4[Data privacy maintained]
-    Y4 --> Y5[Secure and private]
+    subgraph With["With Auth - Your App"]
+        Y1[Must login to access chat]
+        Y1 --> Y2[User identified by google_id]
+        Y2 --> Y3[Personal conversations only]
+        Y3 --> Y4[Data privacy maintained]
+        Y4 --> Y5[Secure and private]
+    end
     
     style N5 fill:#ff6b6b
     style Y5 fill:#51cf66
@@ -367,14 +374,14 @@ flowchart LR
 flowchart TD
     Start([Start Testing]) --> Test1[Open incognito window]
     
-    Test1 --> Test2[Try accessing /chat directly]
-    Test2 --> Check1{Redirected to /?}
+    Test1 --> Test2[Try accessing chat directly]
+    Test2 --> Check1{Redirected to home?}
     Check1 -->|Yes| Pass1[Test 1 Passed]
     Check1 -->|No| Fail1[Auth not working]
     
     Pass1 --> Test3[Click Sign in with Google]
     Test3 --> Test4[Complete Google login]
-    Test4 --> Check2{Redirected to /chat?}
+    Test4 --> Check2{Redirected to chat?}
     Check2 -->|Yes| Pass2[Test 2 Passed]
     Check2 -->|No| Fail2[OAuth not working]
     
@@ -416,10 +423,10 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[User clicks login] --> B[/login route]
+    A[User clicks login] --> B[login route]
     B --> C[Redirect to Google]
     C --> D[Google authenticates]
-    D --> E[/authorize callback]
+    D --> E[authorize callback]
     
     E --> F[Exchange code for token]
     F --> G[Get user info]
@@ -433,11 +440,11 @@ flowchart TD
     K --> L
     
     L --> M[Create session]
-    M --> N[Redirect to /chat]
+    M --> N[Redirect to chat]
     N --> O[Load chat interface]
     
     O --> P[User types message]
-    P --> Q[POST /api/chat]
+    P --> Q[POST to api chat]
     Q --> R[login_required check]
     R --> S[Get user from session]
     S --> T[Get user_id from DB]
